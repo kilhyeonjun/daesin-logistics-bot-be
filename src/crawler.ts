@@ -1,6 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import * as iconv from 'iconv-lite';
+import iconv from 'iconv-lite';
 import { insertRoutes } from './database.js';
 import type { RouteInput, CrawlOptions } from './types/route.js';
 
