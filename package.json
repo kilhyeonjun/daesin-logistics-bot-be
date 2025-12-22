@@ -1,10 +1,12 @@
 {
   "name": "logistics-bot",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "대신물류 배차현황 크롤링 및 카카오톡 챗봇",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "sync": "node -e \"require('./src/crawler').syncAllRoutes().then(() => process.exit(0))\"",
+    "test": "node test-crawl.js"
   },
   "keywords": [],
   "author": "",
