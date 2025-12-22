@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Route {
+  id          Int      @id @default(autoincrement())
+  searchDate  String   @map("search_date")
+  lineCode    String   @map("line_code")
+  lineName    String?  @map("line_name")
+  carCode     String?  @map("car_code")
+  carNumber   String?  @map("car_number")
+  count       Int?     @default(0)
+  quantity    Int?     @default(0)
+  sectionFare Float?   @default(0) @map("section_fare")
+  totalFare   Float?   @default(0) @map("total_fare")
+  createdAt   String?  @default("datetime('now', 'localtime')") @map("created_at")
+
+  @@unique([searchDate, lineCode], map: "sqlite_autoindex_routes_1")
+  @@index([carNumber], map: "idx_routes_car_number")
+  @@index([lineName], map: "idx_routes_line_name")
+  @@index([lineCode], map: "idx_routes_line_code")
+  @@index([searchDate], map: "idx_routes_date")
+  @@map("routes")
+}

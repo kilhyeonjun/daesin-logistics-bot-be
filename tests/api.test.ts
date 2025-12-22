@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import app from '../src/app.js';
+import { createApp } from '../src/app.js';
+
+const app = createApp();
 
 describe('API Endpoints', () => {
   describe('GET /health', () => {
@@ -54,7 +56,7 @@ describe('API Endpoints', () => {
     it('통계 조회', async () => {
       const res = await request(app).get('/api/stats/20251219');
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('total_routes');
+      expect(res.body).toHaveProperty('totalRoutes');
     });
   });
 });

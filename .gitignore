@@ -4,3 +4,5 @@ dist/
 *.db
 result.html
 .DS_Store
+
+/src/generated/prisma

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import app from '../src/app.js';
+import { createApp } from '../src/app.js';
+
+const app = createApp();
 
 // 카카오톡 스킬 요청 헬퍼
 function kakaoRequest(utterance: string) {
