@@ -6,3 +6,10 @@ result.html
 .DS_Store
 
 /src/generated/prisma
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfvars
