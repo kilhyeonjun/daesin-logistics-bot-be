@@ -2,9 +2,9 @@
   "name": "logistics-bot",
   "version": "1.0.0",
   "description": "대신물류 배차현황 크롤링 및 카카오톡 챗봇",
-  "main": "src/server.js",
+  "main": "src/app.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/app.js",
     "sync": "node -e \"require('./src/crawler').syncAllRoutes().then(() => process.exit(0))\"",
     "test": "vitest run",
     "test:watch": "vitest",

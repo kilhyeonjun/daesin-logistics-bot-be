@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import app from '../src/server.js';
+import app from '../src/app.js';
 
 // 카카오톡 스킬 요청 헬퍼
 function kakaoRequest(utterance) {
