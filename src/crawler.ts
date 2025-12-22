@@ -1,19 +1,20 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
-const iconv = require('iconv-lite');
-const { insertRoutes } = require('./database');
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import * as iconv from 'iconv-lite';
+import { insertRoutes } from './database.js';
+import type { RouteInput, CrawlOptions } from './types/route.js';
 
 const BASE_URL = 'http://logistics.ds3211.co.kr/daesin/servlet/total.TotServlet';
 
 // 숫자 파싱 (쉼표 제거)
-function parseNumber(str) {
+function parseNumber(str: string | undefined): number {
   if (!str) return 0;
   const cleaned = str.replace(/,/g, '').trim();
   return parseFloat(cleaned) || 0;
 }
 
 // 오늘 또는 어제 날짜 (오후 2시 기준)
-function getDefaultSearchDate() {
+export function getDefaultSearchDate(): string {
   const now = new Date();
   const hour = now.getHours();
   const day = now.getDay();
@@ -34,7 +35,10 @@ function getDefaultSearchDate() {
 }
 
 // 크롤링 함수
-async function crawlRoutes(searchDate, options = {}) {
+export async function crawlRoutes(
+  searchDate: string,
+  options: CrawlOptions = {}
+): Promise<RouteInput[]> {
   const {
     lineStart = '100000',
     lineEnd = '999999',
@@ -74,10 +78,10 @@ async function crawlRoutes(searchDate, options = {}) {
     const html = iconv.decode(Buffer.from(response.data), 'euc-kr');
     const $ = cheerio.load(html);
 
-    const routes = [];
+    const routes: RouteInput[] = [];
 
     // 데이터 테이블 찾기 (130행 이상인 테이블)
-    $('table.tab1').each((i, table) => {
+    $('table.tab1').each((_i, table) => {
       const rows = $(table).find('tr');
       if (rows.length < 5) return;
 
@@ -86,14 +90,14 @@ async function crawlRoutes(searchDate, options = {}) {
       if (!firstRow.includes('노선코드')) return;
 
       // 데이터 행 파싱
-      rows.slice(1).each((j, row) => {
+      rows.slice(1).each((_j, row) => {
         const cols = $(row).find('td');
         if (cols.length < 10) return;
 
         const lineCode = $(cols[0]).text().trim();
         if (!lineCode || lineCode.length !== 6) return;
 
-        const route = {
+        const route: RouteInput = {
           search_date: searchDate,
           line_code: lineCode,
           line_name: $(cols[1]).text().trim(),
@@ -111,19 +115,20 @@ async function crawlRoutes(searchDate, options = {}) {
 
     return routes;
   } catch (error) {
-    console.error('크롤링 에러:', error.message);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('크롤링 에러:', message);
     throw error;
   }
 }
 
 // 전체 데이터 크롤링 및 저장
-async function syncAllRoutes(searchDate) {
-  searchDate = searchDate || getDefaultSearchDate();
-  console.log(`[${new Date().toLocaleString()}] 크롤링 시작: ${searchDate}`);
+export async function syncAllRoutes(searchDate?: string): Promise<RouteInput[]> {
+  const date = searchDate || getDefaultSearchDate();
+  console.log(`[${new Date().toLocaleString()}] 크롤링 시작: ${date}`);
 
   try {
     // 전체 노선 크롤링 (100000 ~ 999999)
-    const routes = await crawlRoutes(searchDate, {
+    const routes = await crawlRoutes(date, {
       lineStart: '100000',
       lineEnd: '999999'
     });
@@ -137,13 +142,8 @@ async function syncAllRoutes(searchDate) {
 
     return routes;
   } catch (error) {
-    console.error(`[${new Date().toLocaleString()}] 동기화 실패:`, error.message);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[${new Date().toLocaleString()}] 동기화 실패:`, message);
     throw error;
   }
 }
-
-module.exports = {
-  crawlRoutes,
-  syncAllRoutes,
-  getDefaultSearchDate
-};

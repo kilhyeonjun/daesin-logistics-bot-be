@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import db from '../src/database.js';
+import * as db from '../src/database.js';
+import type { RouteInput } from '../src/types/route.js';
 
 describe('Database', () => {
-  const testRoute = {
+  const testRoute: RouteInput = {
     search_date: '20251220',
     line_code: '999999',
     line_name: '테스트→도착지',
@@ -21,7 +22,7 @@ describe('Database', () => {
 
   describe('insertRoutes', () => {
     it('데이터 삽입 성공', () => {
-      const newRoute = {
+      const newRoute: RouteInput = {
         ...testRoute,
         line_code: '999998',
         line_name: '테스트2→도착지2'
@@ -31,7 +32,7 @@ describe('Database', () => {
     });
 
     it('중복 데이터 upsert 동작', () => {
-      const updatedRoute = {
+      const updatedRoute: RouteInput = {
         ...testRoute,
         count: 99
       };

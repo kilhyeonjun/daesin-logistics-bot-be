@@ -1,11 +1,11 @@
-require('dotenv').config();
-const express = require('express');
-const cron = require('node-cron');
-const { syncAllRoutes } = require('./crawler');
+import 'dotenv/config';
+import express from 'express';
+import cron from 'node-cron';
+import { syncAllRoutes } from './crawler.js';
 
 // 라우터
-const apiRoutes = require('./routes/api.routes');
-const kakaoRoutes = require('./routes/kakao.routes');
+import apiRoutes from './routes/api.routes.js';
+import kakaoRoutes from './routes/kakao.routes.js';
 
 const app = express();
 app.use(express.json());
@@ -22,7 +22,8 @@ cron.schedule('0 6,14 * * 1-6', async () => {
   try {
     await syncAllRoutes();
   } catch (error) {
-    console.error('[스케줄러] 동기화 실패:', error.message);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[스케줄러] 동기화 실패:', message);
   }
 });
 
@@ -34,9 +35,10 @@ if (process.env.NODE_ENV !== 'test') {
 
     // 시작 시 한 번 동기화
     syncAllRoutes().catch(err => {
-      console.error('초기 동기화 실패:', err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('초기 동기화 실패:', message);
     });
   });
 }
 
-module.exports = app;
+export default app;

@@ -1,7 +1,13 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+import Database from 'better-sqlite3';
+import type { Database as DatabaseType, Statement } from 'better-sqlite3';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import type { Route, RouteInput, RouteStats } from './types/route.js';
 
-const db = new Database(path.join(__dirname, '..', 'logistics.db'));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const db: DatabaseType = new Database(join(__dirname, '..', 'logistics.db'));
 
 // 테이블 생성
 db.exec(`
@@ -27,7 +33,7 @@ db.exec(`
 `);
 
 // 데이터 삽입/업데이트 (upsert)
-const upsertRoute = db.prepare(`
+const upsertRoute: Statement = db.prepare(`
   INSERT INTO routes (search_date, line_code, line_name, car_code, car_number, count, quantity, section_fare, total_fare)
   VALUES (@search_date, @line_code, @line_name, @car_code, @car_number, @count, @quantity, @section_fare, @total_fare)
   ON CONFLICT(search_date, line_code) DO UPDATE SET
@@ -42,8 +48,8 @@ const upsertRoute = db.prepare(`
 `);
 
 // 여러 건 삽입
-function insertRoutes(routes) {
-  const insert = db.transaction((items) => {
+export function insertRoutes(routes: RouteInput[]): number {
+  const insert = db.transaction((items: RouteInput[]) => {
     for (const item of items) {
       upsertRoute.run(item);
     }
@@ -53,61 +59,61 @@ function insertRoutes(routes) {
 }
 
 // 검색 함수들
-function searchByLineCode(lineCode) {
+export function searchByLineCode(lineCode: string): Route[] {
   return db.prepare(`
     SELECT * FROM routes
     WHERE line_code LIKE ?
     ORDER BY search_date DESC
     LIMIT 50
-  `).all(`%${lineCode}%`);
+  `).all(`%${lineCode}%`) as Route[];
 }
 
-function searchByLineName(lineName) {
+export function searchByLineName(lineName: string): Route[] {
   return db.prepare(`
     SELECT * FROM routes
     WHERE line_name LIKE ?
     ORDER BY search_date DESC
     LIMIT 50
-  `).all(`%${lineName}%`);
+  `).all(`%${lineName}%`) as Route[];
 }
 
-function searchByCarNumber(carNumber) {
+export function searchByCarNumber(carNumber: string): Route[] {
   return db.prepare(`
     SELECT * FROM routes
     WHERE car_number LIKE ?
     ORDER BY search_date DESC
     LIMIT 50
-  `).all(`%${carNumber}%`);
+  `).all(`%${carNumber}%`) as Route[];
 }
 
-function searchByCarCode(carCode) {
+export function searchByCarCode(carCode: string): Route[] {
   return db.prepare(`
     SELECT * FROM routes
     WHERE car_code LIKE ?
     ORDER BY search_date DESC
     LIMIT 50
-  `).all(`%${carCode}%`);
+  `).all(`%${carCode}%`) as Route[];
 }
 
-function searchByDate(date) {
+export function searchByDate(date: string): Route[] {
   return db.prepare(`
     SELECT * FROM routes
     WHERE search_date = ?
     ORDER BY line_code
-  `).all(date);
+  `).all(date) as Route[];
 }
 
 // 최근 데이터 조회
-function getRecentRoutes(limit = 20) {
+export function getRecentRoutes(limit: number = 20): Route[] {
   return db.prepare(`
     SELECT * FROM routes
     ORDER BY search_date DESC, line_code
     LIMIT ?
-  `).all(limit);
+  `).all(limit) as Route[];
 }
 
 // 통계 조회
-function getStatsByDate(date) {
+export function getStatsByDate(date: string): RouteStats {
   return db.prepare(`
     SELECT
       COUNT(*) as total_routes,
@@ -117,17 +123,7 @@ function getStatsByDate(date) {
       SUM(total_fare) as total_fare
     FROM routes
     WHERE search_date = ?
-  `).get(date);
+  `).get(date) as RouteStats;
 }
 
-module.exports = {
-  db,
-  insertRoutes,
-  searchByLineCode,
-  searchByLineName,
-  searchByCarNumber,
-  searchByCarCode,
-  searchByDate,
-  getRecentRoutes,
-  getStatsByDate
-};
+export { db };

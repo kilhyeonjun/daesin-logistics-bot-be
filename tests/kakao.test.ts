@@ -3,7 +3,7 @@ import request from 'supertest';
 import app from '../src/app.js';
 
 // 카카오톡 스킬 요청 헬퍼
-function kakaoRequest(utterance) {
+function kakaoRequest(utterance: string) {
   return request(app)
     .post('/kakao/skill')
     .send({

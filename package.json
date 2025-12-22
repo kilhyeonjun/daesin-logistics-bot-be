@@ -1,14 +1,17 @@
 {
   "name": "logistics-bot",
   "version": "1.0.0",
+  "type": "module",
   "description": "대신물류 배차현황 크롤링 및 카카오톡 챗봇",
-  "main": "src/app.js",
+  "main": "dist/app.js",
   "scripts": {
-    "start": "node src/app.js",
-    "sync": "node -e \"require('./src/crawler').syncAllRoutes().then(() => process.exit(0))\"",
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "dev": "tsx watch src/app.ts",
+    "sync": "tsx -e \"import { syncAllRoutes } from './src/crawler.js'; await syncAllRoutes();\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:crawl": "node test-crawl.js"
+    "test:crawl": "tsx test-crawl.ts"
   },
   "keywords": [],
   "author": "",
@@ -23,7 +26,14 @@
     "node-cron": "^4.2.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/iconv-lite": "^0.0.1",
+    "@types/node": "^25.0.3",
+    "@types/node-cron": "^3.0.11",
     "supertest": "^7.1.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.16"
   }
 }

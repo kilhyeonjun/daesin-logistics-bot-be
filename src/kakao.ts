@@ -1,9 +1,16 @@
 /**
  * 카카오 i 오픈빌더 스킬 응답 포맷 생성
  */
+import type { Route, RouteStats } from './types/route.js';
+import type {
+  KakaoResponse,
+  ListCardItem,
+  ListCardButton,
+  TextCardButton
+} from './types/kakao.js';
 
 // 심플 텍스트 응답
-function simpleText(text) {
+export function simpleText(text: string): KakaoResponse {
   return {
     version: '2.0',
     template: {
@@ -13,7 +20,11 @@ function simpleText(text) {
 }
 
 // 리스트 카드 응답
-function listCard(title, items, buttons = []) {
+export function listCard(
+  title: string,
+  items: ListCardItem[],
+  buttons: ListCardButton[] = []
+): KakaoResponse {
   return {
     version: '2.0',
     template: {
@@ -29,7 +40,11 @@ function listCard(title, items, buttons = []) {
 }
 
 // 텍스트 카드 응답
-function textCard(title, description, buttons = []) {
+export function textCard(
+  title: string,
+  description: string,
+  buttons: TextCardButton[] = []
+): KakaoResponse {
   return {
     version: '2.0',
     template: {
@@ -45,14 +60,14 @@ function textCard(title, description, buttons = []) {
 }
 
 // 노선 데이터를 카카오톡 메시지로 포맷
-function formatRouteMessage(routes) {
+export function formatRouteMessage(routes: Route[]): KakaoResponse {
   if (!routes || routes.length === 0) {
     return simpleText('검색 결과가 없습니다.');
   }
 
   // 5개 이하면 상세 정보
   if (routes.length <= 5) {
-    const items = routes.map(r => ({
+    const items: ListCardItem[] = routes.map(r => ({
       title: `${r.line_name}`,
       description: `차량: ${r.car_number}\n건수: ${r.count} | 수량: ${r.quantity}\n운임: ${Number(r.total_fare).toLocaleString()}원`
     }));
@@ -75,7 +90,7 @@ function formatRouteMessage(routes) {
 }
 
 // 통계 메시지 포맷
-function formatStatsMessage(stats, date) {
+export function formatStatsMessage(stats: RouteStats, date: string): KakaoResponse {
   if (!stats || stats.total_routes === 0) {
     return simpleText(`${date} 데이터가 없습니다.`);
   }
@@ -92,7 +107,7 @@ function formatStatsMessage(stats, date) {
 }
 
 // 도움말 메시지
-function helpMessage() {
+export function helpMessage(): KakaoResponse {
   return simpleText(
 `[물류 조회 도움말]
 
@@ -109,12 +124,3 @@ function helpMessage() {
 "도착 마포"`
   );
 }
-
-module.exports = {
-  simpleText,
-  listCard,
-  textCard,
-  formatRouteMessage,
-  formatStatsMessage,
-  helpMessage
-};

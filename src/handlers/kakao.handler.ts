@@ -1,13 +1,12 @@
-const db = require('../database');
-const { getDefaultSearchDate } = require('../crawler');
-const kakao = require('../kakao');
+import * as db from '../database.js';
+import { getDefaultSearchDate } from '../crawler.js';
+import * as kakao from '../kakao.js';
+import type { KakaoResponse } from '../types/kakao.js';
 
 /**
  * 발화 텍스트를 파싱하여 적절한 응답 생성
- * @param {string} utterance - 사용자 발화
- * @returns {object} 카카오톡 스킬 응답
  */
-function handleUtterance(utterance) {
+export function handleUtterance(utterance: string): KakaoResponse {
   // 도움말
   if (isHelpCommand(utterance)) {
     return kakao.helpMessage();
@@ -63,55 +62,43 @@ function handleUtterance(utterance) {
 }
 
 // 명령어 판별 함수들
-function isHelpCommand(text) {
+export function isHelpCommand(text: string): boolean {
   return text.includes('도움말') || text === '?' || text === '메뉴';
 }
 
-function isLineCodeCommand(text) {
+export function isLineCodeCommand(text: string): boolean {
   return text.startsWith('노선 ') || text.startsWith('노선코드 ');
 }
 
-function isCarNumberCommand(text) {
+export function isCarNumberCommand(text: string): boolean {
   return text.startsWith('차량 ') || text.startsWith('차량번호 ');
 }
 
-function isLineNameCommand(text) {
+export function isLineNameCommand(text: string): boolean {
   return text.startsWith('도착 ') || text.startsWith('노선명 ');
 }
 
-function isTodayStatsCommand(text) {
+export function isTodayStatsCommand(text: string): boolean {
   return text.includes('오늘') && text.includes('현황');
 }
 
-function isYesterdayStatsCommand(text) {
+export function isYesterdayStatsCommand(text: string): boolean {
   return text.includes('어제') && text.includes('현황');
 }
 
-function isNumericCode(text) {
+export function isNumericCode(text: string): boolean {
   return /^\d{4,6}$/.test(text);
 }
 
 // 값 추출 함수들
-function extractLineCode(text) {
+function extractLineCode(text: string): string {
   return text.replace(/^노선(코드)?\s*/, '');
 }
 
-function extractCarNumber(text) {
+function extractCarNumber(text: string): string {
   return text.replace(/^차량(번호)?\s*/, '');
 }
 
-function extractLineName(text) {
+function extractLineName(text: string): string {
   return text.replace(/^(도착|노선명)\s*/, '');
 }
-
-module.exports = {
-  handleUtterance,
-  // 테스트를 위해 내부 함수도 export
-  isHelpCommand,
-  isLineCodeCommand,
-  isCarNumberCommand,
-  isLineNameCommand,
-  isTodayStatsCommand,
-  isYesterdayStatsCommand,
-  isNumericCode
-};
