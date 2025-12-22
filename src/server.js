@@ -138,12 +138,17 @@ cron.schedule('0 6,14 * * 1-6', async () => {
 
 // ============== 서버 시작 ==============
 
-app.listen(PORT, () => {
-  console.log(`서버 시작: http://localhost:${PORT}`);
-  console.log('카카오톡 스킬 URL: POST /kakao/skill');
+// 테스트 환경이 아닐 때만 서버 시작
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`서버 시작: http://localhost:${PORT}`);
+    console.log('카카오톡 스킬 URL: POST /kakao/skill');
 
-  // 시작 시 한 번 동기화
-  syncAllRoutes().catch(err => {
-    console.error('초기 동기화 실패:', err.message);
+    // 시작 시 한 번 동기화
+    syncAllRoutes().catch(err => {
+      console.error('초기 동기화 실패:', err.message);
+    });
   });
-});
+}
+
+module.exports = app;
