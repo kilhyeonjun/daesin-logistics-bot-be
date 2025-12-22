@@ -11,6 +11,7 @@
     "sync": "tsx -e \"import { syncAllRoutes } from './src/crawler.js'; await syncAllRoutes();\"",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "npm run build && tsx scripts/integration-test.ts",
     "test:crawl": "tsx test-crawl.ts"
   },
   "keywords": [],
