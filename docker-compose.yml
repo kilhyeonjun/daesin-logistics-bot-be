@@ -3,9 +3,12 @@ services:
     build: .
     container_name: daesin-logistics-bot
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "3000:3000"
     volumes:
       - ./data:/app/data
+    extra_hosts:
+      - "logistics.ds3211.co.kr:211.51.241.159"
     environment:
       - NODE_ENV=production
       - PORT=3000
