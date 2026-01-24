@@ -63,19 +63,12 @@ export class KakaoResponseFormatter {
       return this.simpleText('검색 결과가 없습니다.');
     }
 
-    if (routes.length <= 5) {
-      const items: ListCardItem[] = routes.map((r) => ({
-        title: `${r.lineName}`,
-        description: `차량: ${r.carNumber}\n건수: ${r.count} | 수량: ${r.quantity}\n운임: ${Number(r.totalFare).toLocaleString()}원`,
-      }));
-
-      return this.listCard(`검색 결과 (${routes.length}건)`, items);
-    }
-
-    let text = `총 ${routes.length}건 검색됨\n\n`;
+    let text = `[검색 결과 ${routes.length}건]\n`;
     routes.slice(0, 10).forEach((r, i) => {
-      text += `${i + 1}. ${r.lineCode} ${r.lineName}\n`;
-      text += `   차량: ${r.carNumber} | 건수: ${r.count}\n`;
+      text += `\n${i + 1}. ${r.lineName}\n`;
+      text += `   차량: ${r.carNumber}\n`;
+      text += `   건수: ${r.count} | 수량: ${r.quantity}\n`;
+      text += `   운임: ${Number(r.totalFare).toLocaleString()}원\n`;
     });
 
     if (routes.length > 10) {
