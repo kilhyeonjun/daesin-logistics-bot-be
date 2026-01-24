@@ -7,6 +7,9 @@ services:
       - "3000:3000"
     volumes:
       - ./data:/app/data
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       - NODE_ENV=production
       - PORT=3000
