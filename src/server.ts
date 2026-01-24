@@ -27,8 +27,8 @@ async function bootstrap(): Promise<void> {
       console.error('초기 동기화 실패:', error);
     }
 
-    // Schedule sync: 6 AM and 2 PM, Monday to Saturday
-    cron.schedule('0 6,14 * * 1-6', async () => {
+    // Schedule sync: Every hour from 6 AM to 8 PM, Monday to Saturday
+    cron.schedule('0 6-20 * * 1-6', async () => {
       try {
         const syncUseCase = container.resolve(SyncRoutesUseCase);
         await syncUseCase.execute();
