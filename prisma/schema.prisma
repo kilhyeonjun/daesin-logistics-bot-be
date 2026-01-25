@@ -32,3 +32,18 @@ model Route {
   @@index([searchDate], map: "idx_routes_date")
   @@map("routes")
 }
+
+model MigrationJob {
+  id          Int      @id @default(autoincrement())
+  startDate   String   @map("start_date")
+  endDate     String   @map("end_date")
+  status      String   @default("pending")
+  currentDate String?  @map("current_date")
+  totalDays   Int      @default(0) @map("total_days")
+  completedDays Int    @default(0) @map("completed_days")
+  errorMessage String? @map("error_message")
+  createdAt   String   @default("datetime('now', 'localtime')") @map("created_at")
+  updatedAt   String?  @map("updated_at")
+
+  @@map("migration_jobs")
+}

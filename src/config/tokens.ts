@@ -4,6 +4,7 @@ export const TOKENS = {
 
   // Repositories
   RouteRepository: Symbol.for('IRouteRepository'),
+  MigrationJobRepository: Symbol.for('IMigrationJobRepository'),
 
   // Ports
   Crawler: Symbol.for('ICrawler'),
@@ -14,4 +15,5 @@ export const TOKENS = {
   SearchRoutesByCarUseCase: Symbol.for('SearchRoutesByCarUseCase'),
   SyncRoutesUseCase: Symbol.for('SyncRoutesUseCase'),
   GetStatsUseCase: Symbol.for('GetStatsUseCase'),
+  MigrationUseCase: Symbol.for('MigrationUseCase'),
 } as const;
