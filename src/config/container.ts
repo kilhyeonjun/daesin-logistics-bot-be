@@ -8,10 +8,16 @@ import type { IRouteRepository } from '../domain/repositories/IRouteRepository.j
 import { PrismaRouteRepository } from '../infrastructure/persistence/PrismaRouteRepository.js';
 import type { IMigrationJobRepository } from '../domain/repositories/IMigrationJobRepository.js';
 import { PrismaMigrationJobRepository } from '../infrastructure/persistence/PrismaMigrationJobRepository.js';
+import type { IAdminRepository } from '../domain/repositories/IAdminRepository.js';
+import { PrismaAdminRepository } from '../infrastructure/persistence/PrismaAdminRepository.js';
 
 // Ports
 import type { ICrawler } from '../domain/ports/ICrawler.js';
 import { CheerioHttpCrawler } from '../infrastructure/crawling/CheerioHttpCrawler.js';
+
+// Auth Services
+import { PasswordService } from '../infrastructure/auth/PasswordService.js';
+import { JwtService } from '../infrastructure/auth/JwtService.js';
 
 // Use Cases
 import { SearchRoutesByCodeUseCase } from '../application/use-cases/SearchRoutesByCodeUseCase.js';
@@ -20,6 +26,7 @@ import { SearchRoutesByCarUseCase } from '../application/use-cases/SearchRoutesB
 import { SyncRoutesUseCase } from '../application/use-cases/SyncRoutesUseCase.js';
 import { GetStatsUseCase } from '../application/use-cases/GetStatsUseCase.js';
 import { MigrationUseCase } from '../application/use-cases/MigrationUseCase.js';
+import { LoginUseCase } from '../application/use-cases/LoginUseCase.js';
 
 let prismaClient: PrismaClient | null = null;
 
@@ -35,10 +42,21 @@ export function configureContainer(): void {
   container.register<IMigrationJobRepository>(TOKENS.MigrationJobRepository, {
     useClass: PrismaMigrationJobRepository,
   });
+  container.register<IAdminRepository>(TOKENS.AdminRepository, {
+    useClass: PrismaAdminRepository,
+  });
 
   // Ports
   container.register<ICrawler>(TOKENS.Crawler, {
     useClass: CheerioHttpCrawler,
+  });
+
+  // Auth Services
+  container.register(TOKENS.PasswordService, {
+    useClass: PasswordService,
+  });
+  container.register(TOKENS.JwtService, {
+    useClass: JwtService,
   });
 
   // Use Cases
@@ -59,6 +77,9 @@ export function configureContainer(): void {
   });
   container.register(MigrationUseCase, {
     useClass: MigrationUseCase,
+  });
+  container.register(TOKENS.LoginUseCase, {
+    useClass: LoginUseCase,
   });
 }
 
