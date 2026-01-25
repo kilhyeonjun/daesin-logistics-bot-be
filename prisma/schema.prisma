@@ -47,3 +47,14 @@ model MigrationJob {
 
   @@map("migration_jobs")
 }
+
+model Admin {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String?
+  createdAt    String   @default("datetime('now', 'localtime')") @map("created_at")
+  updatedAt    String?  @map("updated_at")
+
+  @@map("admins")
+}

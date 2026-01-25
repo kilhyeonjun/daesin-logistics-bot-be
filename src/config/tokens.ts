@@ -5,9 +5,14 @@ export const TOKENS = {
   // Repositories
   RouteRepository: Symbol.for('IRouteRepository'),
   MigrationJobRepository: Symbol.for('IMigrationJobRepository'),
+  AdminRepository: Symbol.for('IAdminRepository'),
 
   // Ports
   Crawler: Symbol.for('ICrawler'),
+
+  // Auth Services
+  PasswordService: Symbol.for('PasswordService'),
+  JwtService: Symbol.for('JwtService'),
 
   // Use Cases
   SearchRoutesByCodeUseCase: Symbol.for('SearchRoutesByCodeUseCase'),
@@ -16,4 +21,5 @@ export const TOKENS = {
   SyncRoutesUseCase: Symbol.for('SyncRoutesUseCase'),
   GetStatsUseCase: Symbol.for('GetStatsUseCase'),
   MigrationUseCase: Symbol.for('MigrationUseCase'),
+  LoginUseCase: Symbol.for('LoginUseCase'),
 } as const;
