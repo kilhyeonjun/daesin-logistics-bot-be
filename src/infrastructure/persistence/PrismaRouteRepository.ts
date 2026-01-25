@@ -103,6 +103,10 @@ export class PrismaRouteRepository implements IRouteRepository {
           quantity: route.quantity,
           sectionFare: route.sectionFare,
           totalFare: route.totalFare,
+          raceInfoUrl: route.raceInfoUrl,
+          carDetailUrl: route.carDetailUrl,
+          trackingUrl: route.trackingUrl,
+          waypointUrl: route.waypointUrl,
         },
         update: {
           lineName: route.lineName,
@@ -112,6 +116,10 @@ export class PrismaRouteRepository implements IRouteRepository {
           quantity: route.quantity,
           sectionFare: route.sectionFare,
           totalFare: route.totalFare,
+          raceInfoUrl: route.raceInfoUrl,
+          carDetailUrl: route.carDetailUrl,
+          trackingUrl: route.trackingUrl,
+          waypointUrl: route.waypointUrl,
         },
       })
     );
@@ -132,6 +140,10 @@ export class PrismaRouteRepository implements IRouteRepository {
     sectionFare: number | null;
     totalFare: number | null;
     createdAt: string | null;
+    raceInfoUrl: string | null;
+    carDetailUrl: string | null;
+    trackingUrl: string | null;
+    waypointUrl: string | null;
   }): Route {
     return new Route({
       id: record.id,
@@ -145,6 +157,10 @@ export class PrismaRouteRepository implements IRouteRepository {
       sectionFare: record.sectionFare ?? 0,
       totalFare: record.totalFare ?? 0,
       createdAt: record.createdAt ?? undefined,
+      raceInfoUrl: record.raceInfoUrl,
+      carDetailUrl: record.carDetailUrl,
+      trackingUrl: record.trackingUrl,
+      waypointUrl: record.waypointUrl,
     });
   }
 }
