@@ -10,6 +10,10 @@ export interface RouteProps {
   sectionFare: number;
   totalFare: number;
   createdAt?: string;
+  raceInfoUrl?: string | null;
+  carDetailUrl?: string | null;
+  trackingUrl?: string | null;
+  waypointUrl?: string | null;
 }
 
 export class Route {
@@ -24,6 +28,10 @@ export class Route {
   readonly sectionFare: number;
   readonly totalFare: number;
   readonly createdAt?: string;
+  readonly raceInfoUrl: string | null;
+  readonly carDetailUrl: string | null;
+  readonly trackingUrl: string | null;
+  readonly waypointUrl: string | null;
 
   constructor(props: RouteProps) {
     this.id = props.id;
@@ -37,6 +45,10 @@ export class Route {
     this.sectionFare = props.sectionFare;
     this.totalFare = props.totalFare;
     this.createdAt = props.createdAt;
+    this.raceInfoUrl = props.raceInfoUrl ?? null;
+    this.carDetailUrl = props.carDetailUrl ?? null;
+    this.trackingUrl = props.trackingUrl ?? null;
+    this.waypointUrl = props.waypointUrl ?? null;
   }
 
   static create(props: Omit<RouteProps, 'id' | 'createdAt'>): Route {
