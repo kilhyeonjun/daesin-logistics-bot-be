@@ -19,6 +19,11 @@ model Route {
   sectionFare Float?   @default(0) @map("section_fare")
   totalFare   Float?   @default(0) @map("total_fare")
   createdAt   String?  @default("datetime('now', 'localtime')") @map("created_at")
+  
+  raceInfoUrl   String?  @map("race_info_url")
+  carDetailUrl  String?  @map("car_detail_url")
+  trackingUrl   String?  @map("tracking_url")
+  waypointUrl   String?  @map("waypoint_url")
 
   @@unique([searchDate, lineCode], map: "sqlite_autoindex_routes_1")
   @@index([carNumber], map: "idx_routes_car_number")
