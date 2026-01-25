@@ -6,6 +6,8 @@ import { TOKENS } from './tokens.js';
 // Repositories
 import type { IRouteRepository } from '../domain/repositories/IRouteRepository.js';
 import { PrismaRouteRepository } from '../infrastructure/persistence/PrismaRouteRepository.js';
+import type { IMigrationJobRepository } from '../domain/repositories/IMigrationJobRepository.js';
+import { PrismaMigrationJobRepository } from '../infrastructure/persistence/PrismaMigrationJobRepository.js';
 
 // Ports
 import type { ICrawler } from '../domain/ports/ICrawler.js';
@@ -17,6 +19,7 @@ import { SearchRoutesByNameUseCase } from '../application/use-cases/SearchRoutes
 import { SearchRoutesByCarUseCase } from '../application/use-cases/SearchRoutesByCarUseCase.js';
 import { SyncRoutesUseCase } from '../application/use-cases/SyncRoutesUseCase.js';
 import { GetStatsUseCase } from '../application/use-cases/GetStatsUseCase.js';
+import { MigrationUseCase } from '../application/use-cases/MigrationUseCase.js';
 
 let prismaClient: PrismaClient | null = null;
 
@@ -28,6 +31,9 @@ export function configureContainer(): void {
   // Repositories
   container.register<IRouteRepository>(TOKENS.RouteRepository, {
     useClass: PrismaRouteRepository,
+  });
+  container.register<IMigrationJobRepository>(TOKENS.MigrationJobRepository, {
+    useClass: PrismaMigrationJobRepository,
   });
 
   // Ports
@@ -50,6 +56,9 @@ export function configureContainer(): void {
   });
   container.register(GetStatsUseCase, {
     useClass: GetStatsUseCase,
+  });
+  container.register(MigrationUseCase, {
+    useClass: MigrationUseCase,
   });
 }
 
