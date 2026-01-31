@@ -1,9 +1,36 @@
 services:
-  app:
-    build: .
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
     restart: unless-stopped
+    command:
+      # File Provider (no Docker socket needed!)
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--log.level=INFO"
     ports:
-      - "3000:3000"
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - ./traefik:/etc/traefik/dynamic:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/overview"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-network
+
+  app-blue: &app-base
+    build: .
+    container_name: app-blue
+    restart: unless-stopped
+    expose:
+      - "3000"
     volumes:
       - ./data:/app/data
     extra_hosts:
@@ -15,7 +42,20 @@ services:
       - API_KEY=${API_KEY}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 3
       start_period: 10s
+    networks:
+      - app-network
+    depends_on:
+      traefik:
+        condition: service_healthy
+
+  app-green:
+    <<: *app-base
+    container_name: app-green
+
+networks:
+  app-network:
+    driver: bridge
