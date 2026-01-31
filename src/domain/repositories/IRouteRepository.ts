@@ -1,4 +1,4 @@
-import type { Route, RouteStats } from '../entities/Route.js';
+import type { Route, RouteStats, MonthlyRouteStats } from '../entities/Route.js';
 
 export interface IRouteRepository {
   findByLineCode(code: string, limit?: number): Promise<Route[]>;
@@ -8,5 +8,6 @@ export interface IRouteRepository {
   findByDate(date: string): Promise<Route[]>;
   findRecent(limit?: number): Promise<Route[]>;
   getStatsByDate(date: string): Promise<RouteStats>;
+  getStatsByMonth(yearMonth: string): Promise<MonthlyRouteStats>;
   upsertMany(routes: Route[]): Promise<number>;
 }

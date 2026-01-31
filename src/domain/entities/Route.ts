@@ -74,3 +74,7 @@ export interface RouteStats {
   totalSectionFare: number;
   totalFare: number;
 }
+
+export interface MonthlyRouteStats {
+  days: Record<string, RouteStats>;
+}

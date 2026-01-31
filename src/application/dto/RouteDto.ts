@@ -1,4 +1,4 @@
-import type { Route, RouteStats } from '../../domain/entities/Route.js';
+import type { Route, RouteStats, MonthlyRouteStats } from '../../domain/entities/Route.js';
 
 export interface RouteDto {
   id?: number;
@@ -23,6 +23,10 @@ export interface StatsDto {
   totalQuantity: number;
   totalSectionFare: number;
   totalFare: number;
+}
+
+export interface MonthlyStatsDto {
+  days: Record<string, StatsDto>;
 }
 
 export interface SyncResultDto {
@@ -59,5 +63,13 @@ export class RouteMapper {
       totalSectionFare: stats.totalSectionFare,
       totalFare: stats.totalFare,
     };
+  }
+
+  static toMonthlyStatsDto(stats: MonthlyRouteStats): MonthlyStatsDto {
+    const days: Record<string, StatsDto> = {};
+    for (const [date, dayStats] of Object.entries(stats.days)) {
+      days[date] = RouteMapper.toStatsDto(dayStats);
+    }
+    return { days };
   }
 }
