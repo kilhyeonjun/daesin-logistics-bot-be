@@ -25,6 +25,7 @@ import { SearchRoutesByNameUseCase } from '../application/use-cases/SearchRoutes
 import { SearchRoutesByCarUseCase } from '../application/use-cases/SearchRoutesByCarUseCase.js';
 import { SyncRoutesUseCase } from '../application/use-cases/SyncRoutesUseCase.js';
 import { GetStatsUseCase } from '../application/use-cases/GetStatsUseCase.js';
+import { GetMonthlyStatsUseCase } from '../application/use-cases/GetMonthlyStatsUseCase.js';
 import { MigrationUseCase } from '../application/use-cases/MigrationUseCase.js';
 import { LoginUseCase } from '../application/use-cases/LoginUseCase.js';
 
@@ -74,6 +75,9 @@ export function configureContainer(): void {
   });
   container.register(GetStatsUseCase, {
     useClass: GetStatsUseCase,
+  });
+  container.register(GetMonthlyStatsUseCase, {
+    useClass: GetMonthlyStatsUseCase,
   });
   container.register(MigrationUseCase, {
     useClass: MigrationUseCase,

@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { PrismaClient } from '@prisma/client';
 import type { IRouteRepository } from '../../domain/repositories/IRouteRepository.js';
-import { Route, RouteStats } from '../../domain/entities/Route.js';
+import { Route, RouteStats, MonthlyRouteStats } from '../../domain/entities/Route.js';
 import { TOKENS } from '../../config/tokens.js';
 
 @injectable()
@@ -82,6 +82,38 @@ export class PrismaRouteRepository implements IRouteRepository {
       totalSectionFare: result._sum.sectionFare ?? 0,
       totalFare: result._sum.totalFare ?? 0,
     };
+  }
+
+  async getStatsByMonth(yearMonth: string): Promise<MonthlyRouteStats> {
+    const routes = await this.prisma.route.groupBy({
+      by: ['searchDate'],
+      where: {
+        searchDate: {
+          startsWith: yearMonth,
+        },
+      },
+      _count: { id: true },
+      _sum: {
+        count: true,
+        quantity: true,
+        sectionFare: true,
+        totalFare: true,
+      },
+      orderBy: { searchDate: 'asc' },
+    });
+
+    const days: Record<string, RouteStats> = {};
+    for (const row of routes) {
+      days[row.searchDate] = {
+        totalRoutes: row._count.id,
+        totalCount: row._sum.count ?? 0,
+        totalQuantity: row._sum.quantity ?? 0,
+        totalSectionFare: row._sum.sectionFare ?? 0,
+        totalFare: row._sum.totalFare ?? 0,
+      };
+    }
+
+    return { days };
   }
 
   async upsertMany(routes: Route[]): Promise<number> {

@@ -31,6 +31,7 @@ export function createRoutes(): Router {
   router.get('/api/routes/name/:name', apiKeyAuth, (req, res) => routeController.findByName(req, res));
   router.get('/api/routes/car/:number', apiKeyAuth, (req, res) => routeController.findByCar(req, res));
   router.get('/api/routes/date/:date', apiKeyAuth, (req, res) => routeController.findByDate(req, res));
+  router.get('/api/stats/monthly', apiKeyAuth, (req, res) => routeController.getStatsByMonth(req, res));
   router.get('/api/stats/:date', apiKeyAuth, (req, res) => routeController.getStatsByDate(req, res));
 
   router.post('/api/migration', apiKeyAuth, adminAuth, (req, res) => migrationController.startMigration(req, res));

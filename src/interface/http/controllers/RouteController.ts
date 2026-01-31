@@ -4,6 +4,7 @@ import { SearchRoutesByCodeUseCase } from '../../../application/use-cases/Search
 import { SearchRoutesByNameUseCase } from '../../../application/use-cases/SearchRoutesByNameUseCase.js';
 import { SearchRoutesByCarUseCase } from '../../../application/use-cases/SearchRoutesByCarUseCase.js';
 import { GetStatsUseCase } from '../../../application/use-cases/GetStatsUseCase.js';
+import { GetMonthlyStatsUseCase } from '../../../application/use-cases/GetMonthlyStatsUseCase.js';
 import type { IRouteRepository } from '../../../domain/repositories/IRouteRepository.js';
 import { TOKENS } from '../../../config/tokens.js';
 import { RouteMapper } from '../../../application/dto/RouteDto.js';
@@ -19,6 +20,8 @@ export class RouteController {
     private readonly searchByCar: SearchRoutesByCarUseCase,
     @inject(GetStatsUseCase)
     private readonly getStats: GetStatsUseCase,
+    @inject(GetMonthlyStatsUseCase)
+    private readonly getMonthlyStats: GetMonthlyStatsUseCase,
     @inject(TOKENS.RouteRepository)
     private readonly routeRepository: IRouteRepository
   ) {}
@@ -66,6 +69,21 @@ export class RouteController {
   async getStatsByDate(req: Request, res: Response): Promise<void> {
     try {
       const stats = await this.getStats.execute(req.params.date);
+      res.json(stats);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ success: false, error: message });
+    }
+  }
+
+  async getStatsByMonth(req: Request, res: Response): Promise<void> {
+    try {
+      const yearMonth = req.query.yearMonth as string;
+      if (!yearMonth) {
+        res.status(400).json({ success: false, error: 'yearMonth query parameter is required' });
+        return;
+      }
+      const stats = await this.getMonthlyStats.execute(yearMonth);
       res.json(stats);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

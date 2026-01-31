@@ -20,6 +20,7 @@ export const TOKENS = {
   SearchRoutesByCarUseCase: Symbol.for('SearchRoutesByCarUseCase'),
   SyncRoutesUseCase: Symbol.for('SyncRoutesUseCase'),
   GetStatsUseCase: Symbol.for('GetStatsUseCase'),
+  GetMonthlyStatsUseCase: Symbol.for('GetMonthlyStatsUseCase'),
   MigrationUseCase: Symbol.for('MigrationUseCase'),
   LoginUseCase: Symbol.for('LoginUseCase'),
 } as const;
