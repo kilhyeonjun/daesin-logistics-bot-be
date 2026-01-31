@@ -251,9 +251,44 @@ docker logs -f daesin-logistics-bot
 # 재시작
 docker compose restart
 
-# 업데이트 배포
+# 업데이트 배포 (다운타임 발생)
 git pull && docker compose up -d --build
 ```
+
+### 배포 스크립트
+
+```bash
+# 자동 배포 (git pull + build + restart)
+./scripts/deploy.sh
+```
+
+### Zero-Downtime Deployment (무중단 배포)
+
+> ⚠️ **현재 제한사항**: 호스트 포트 바인딩(`3000:3000`) 사용 시 완전 무중단 불가.
+> 리버스 프록시(Traefik, nginx 등) 도입 시 `docker rollout` 사용 가능.
+
+#### Docker Rollout 플러그인 설치 (macOS)
+
+```bash
+# 디렉토리 생성
+mkdir -p ~/.docker/cli-plugins
+
+# 플러그인 다운로드
+curl -sL https://github.com/wowu/docker-rollout/releases/latest/download/docker-rollout \
+  -o ~/.docker/cli-plugins/docker-rollout
+
+# 실행 권한 부여
+chmod +x ~/.docker/cli-plugins/docker-rollout
+```
+
+#### 사용법 (리버스 프록시 환경)
+
+```bash
+docker compose build
+docker rollout app
+```
+
+> **참고**: 리버스 프록시 뒤에서 컨테이너가 내부 네트워크로만 통신할 때 무중단 롤링 업데이트 가능.
 
 ### 데이터 백업
 

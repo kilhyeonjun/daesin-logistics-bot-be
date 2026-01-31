@@ -1,7 +1,6 @@
 services:
   app:
     build: .
-    container_name: daesin-logistics-bot
     restart: unless-stopped
     ports:
       - "3000:3000"
