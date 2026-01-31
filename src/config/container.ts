@@ -14,6 +14,8 @@ import { PrismaAdminRepository } from '../infrastructure/persistence/PrismaAdmin
 // Ports
 import type { ICrawler } from '../domain/ports/ICrawler.js';
 import { CheerioHttpCrawler } from '../infrastructure/crawling/CheerioHttpCrawler.js';
+import type { ICacheService } from '../domain/ports/ICacheService.js';
+import { InMemoryCacheService } from '../infrastructure/cache/InMemoryCacheService.js';
 
 // Auth Services
 import { PasswordService } from '../infrastructure/auth/PasswordService.js';
@@ -51,6 +53,7 @@ export function configureContainer(): void {
   container.register<ICrawler>(TOKENS.Crawler, {
     useClass: CheerioHttpCrawler,
   });
+  container.registerSingleton<ICacheService>(TOKENS.CacheService, InMemoryCacheService);
 
   // Auth Services
   container.register(TOKENS.PasswordService, {
