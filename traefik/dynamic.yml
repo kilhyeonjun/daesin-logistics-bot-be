@@ -1,0 +1,37 @@
+## Traefik Dynamic Configuration (File Provider)
+## Blue-Green deployment routing
+
+http:
+  routers:
+    # Main router - routes to active service
+    app:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      service: app-active
+      priority: 1
+
+  services:
+    # Active service - switch between blue/green by uncommenting
+    app-active:
+      loadBalancer:
+        servers:
+          # BLUE (default active)
+          - url: "http://app-blue:3000"
+          # GREEN (uncomment to switch, comment blue)
+          # - url: "http://app-green:3000"
+        healthCheck:
+          path: /health
+          interval: "10s"
+          timeout: "5s"
+
+    # Direct access services (for testing)
+    app-blue-direct:
+      loadBalancer:
+        servers:
+          - url: "http://app-blue:3000"
+
+    app-green-direct:
+      loadBalancer:
+        servers:
+          - url: "http://app-green:3000"

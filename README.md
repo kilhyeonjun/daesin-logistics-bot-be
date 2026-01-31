@@ -236,59 +236,95 @@ POST /kakao/skill
 
 ## Docker 운영
 
+### 아키텍처
+
+Traefik 리버스 프록시를 사용한 Blue-Green 배포 구조:
+
+```
+Internet
+  ↓
+Tailscale Funnel (HTTPS, *.ts.net)
+  ↓
+localhost:80
+  ↓
+Traefik (리버스 프록시)
+  ├── app-blue (활성)   ─┐
+  └── app-green (대기)  ─┴── SQLite DB (./data)
+```
+
+| 컴포넌트 | 역할 | 포트 |
+|----------|------|------|
+| Traefik | 리버스 프록시, 라우팅, 헬스체크 | 80 (웹), 8080 (대시보드) |
+| app-blue | 프로덕션 서비스 (Blue) | 3000 (내부) |
+| app-green | 프로덕션 서비스 (Green) | 3000 (내부) |
+
 ### 명령어
 
 ```bash
-# 시작
+# 시작 (Blue 활성, 기본값)
 docker compose up -d
 
 # 중지
 docker compose down
 
 # 로그 확인
-docker logs -f daesin-logistics-bot
+docker logs -f app-blue
+docker logs -f traefik
 
-# 재시작
-docker compose restart
-
-# 업데이트 배포 (다운타임 발생)
-git pull && docker compose up -d --build
+# Traefik 대시보드
+open http://localhost:8080/dashboard/
 ```
 
-### 배포 스크립트
+### 무중단 배포 (Zero-Downtime Deployment)
+
+Blue-Green 배포 전략으로 무중단 배포를 지원합니다.
+
+#### 자동 배포 스크립트
 
 ```bash
-# 자동 배포 (git pull + build + restart)
+# git pull + build + Blue-Green 전환
 ./scripts/deploy.sh
 ```
 
-### Zero-Downtime Deployment (무중단 배포)
+스크립트가 자동으로:
+1. 최신 코드 pull
+2. 새 이미지 빌드
+3. 비활성 서비스(Blue/Green) 시작
+4. 헬스체크 대기
+5. 트래픽 전환
+6. 이전 서비스 정리
 
-> ⚠️ **현재 제한사항**: 호스트 포트 바인딩(`3000:3000`) 사용 시 완전 무중단 불가.
-> 리버스 프록시(Traefik, nginx 등) 도입 시 `docker rollout` 사용 가능.
-
-#### Docker Rollout 플러그인 설치 (macOS)
-
-```bash
-# 디렉토리 생성
-mkdir -p ~/.docker/cli-plugins
-
-# 플러그인 다운로드
-curl -sL https://github.com/wowu/docker-rollout/releases/latest/download/docker-rollout \
-  -o ~/.docker/cli-plugins/docker-rollout
-
-# 실행 권한 부여
-chmod +x ~/.docker/cli-plugins/docker-rollout
-```
-
-#### 사용법 (리버스 프록시 환경)
+#### 수동 Blue-Green 전환
 
 ```bash
-docker compose build
-docker rollout app
+# 현재 상태 확인
+docker compose ps
+
+# Blue → Green 전환
+BLUE_ENABLED=false GREEN_ENABLED=true docker compose up -d
+
+# Green → Blue 롤백
+BLUE_ENABLED=true GREEN_ENABLED=false docker compose up -d
 ```
 
-> **참고**: 리버스 프록시 뒤에서 컨테이너가 내부 네트워크로만 통신할 때 무중단 롤링 업데이트 가능.
+#### 환경변수
+
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `BLUE_ENABLED` | `true` | Blue 서비스 활성화 |
+| `GREEN_ENABLED` | `false` | Green 서비스 활성화 |
+
+### Tailscale Funnel 설정
+
+Traefik 도입으로 Funnel 포트가 변경됩니다:
+
+```bash
+# 기존 포트 3000 → 새 포트 80
+tailscale funnel --bg localhost:80
+
+# 기존 funnel 제거 (필요시)
+tailscale funnel off localhost:3000
+```
 
 ### 데이터 백업
 
