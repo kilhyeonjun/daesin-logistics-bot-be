@@ -30,6 +30,11 @@ description: |
 
 | 스킬 | 설명 | 커버 파일 패턴 |
 |------|------|---------------|
+| `verify-clean-architecture` | Clean Architecture 레이어 의존성 규칙 검증 | `src/domain/**`, `src/application/**`, `src/infrastructure/**`, `src/interface/**` |
+| `verify-import-conventions` | ESM import 규칙 검증 (.js 확장자, reflect-metadata 순서, type import) | `src/**/*.ts` |
+| `verify-naming-conventions` | 파일명/클래스/인터페이스/토큰 네이밍 규칙 검증 | `src/**/*.ts` |
+| `verify-di-pattern` | TSyringe DI 패턴 검증 (@injectable, @inject, TOKENS, container 동기화) | `src/config/tokens.ts`, `src/config/container.ts`, `src/application/use-cases/**`, `src/infrastructure/**`, `src/interface/**/controllers/**` |
+| `verify-type-safety` | TypeScript 타입 안전성 검증 (as any, @ts-ignore, 빈 catch 블록) | `src/**/*.ts` |
 
 ## 워크플로우
 
