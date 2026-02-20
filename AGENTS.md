@@ -266,3 +266,8 @@ it('should return 200', async () => {
 |-------|---------|
 | `verify-implementation` | 모든 verify 스킬 순차 실행 → 통합 검증 보고서 생성 |
 | `manage-skills` | 세션 변경사항 분석 → verify 스킬 생성/업데이트/AGENTS.md 관리 |
+| `verify-clean-architecture` | Clean Architecture 레이어 의존성 규칙 검증 |
+| `verify-import-conventions` | ESM import 규칙 검증 (.js 확장자, reflect-metadata 순서, type import) |
+| `verify-naming-conventions` | 파일명/클래스/인터페이스/토큰 네이밍 규칙 검증 |
+| `verify-di-pattern` | TSyringe DI 패턴 검증 (@injectable, @inject, TOKENS, container 동기화) |
+| `verify-type-safety` | TypeScript 타입 안전성 검증 (as any, @ts-ignore, 빈 catch 블록) |

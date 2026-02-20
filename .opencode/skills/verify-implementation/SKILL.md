@@ -29,6 +29,11 @@ description: |
 
 | # | 스킬 | 설명 |
 |---|------|------|
+| 1 | `verify-clean-architecture` | Clean Architecture 레이어 의존성 규칙 검증 |
+| 2 | `verify-import-conventions` | ESM import 규칙 검증 (.js 확장자, reflect-metadata 순서, type import) |
+| 3 | `verify-naming-conventions` | 파일명/클래스/인터페이스/토큰 네이밍 규칙 검증 |
+| 4 | `verify-di-pattern` | TSyringe DI 패턴 검증 (@injectable, @inject, TOKENS, container 동기화) |
+| 5 | `verify-type-safety` | TypeScript 타입 안전성 검증 (as any, @ts-ignore, 빈 catch 블록) |
 
 ## 워크플로우
 
