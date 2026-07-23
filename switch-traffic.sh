@@ -17,9 +17,11 @@ usage() {
 }
 
 get_current_target() {
-    if grep -q '^\s*- url: "http://app-blue:3000"' "$DYNAMIC_CONFIG" 2>/dev/null; then
+    local active_config
+    active_config=$(sed -n '/^[[:space:]]*app-active:/,/^[[:space:]]*app-blue-direct:/p' "$DYNAMIC_CONFIG" 2>/dev/null)
+    if grep -q 'url: "http://app-blue:3000"' <<< "$active_config"; then
         echo "blue"
-    elif grep -q '^\s*- url: "http://app-green:3000"' "$DYNAMIC_CONFIG" 2>/dev/null; then
+    elif grep -q 'url: "http://app-green:3000"' <<< "$active_config"; then
         echo "green"
     else
         echo "unknown"

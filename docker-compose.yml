@@ -62,6 +62,8 @@ services:
     container_name: scheduler
     restart: unless-stopped
     command: ["node", "dist/scheduler.js"]
+    healthcheck:
+      disable: true
     volumes:
       - ./data:/app/data
     extra_hosts:

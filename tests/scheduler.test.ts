@@ -26,6 +26,7 @@ describe('route sync schedule', () => {
 
     expect(compose.services.scheduler.environment.TZ).toBe('Asia/Seoul');
     expect(compose.services.scheduler.command).toEqual(['node', 'dist/scheduler.js']);
+    expect(compose.services.scheduler.healthcheck.disable).toBe(true);
     expect(serverSource).not.toContain('SyncRoutesUseCase');
   });
 });

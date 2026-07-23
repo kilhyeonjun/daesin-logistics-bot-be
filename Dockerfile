@@ -22,8 +22,9 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
+# Set OS timezone and create non-root user
+RUN apk add --no-cache tzdata && \
+    addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 appuser
 
 # Copy package files and install production dependencies only

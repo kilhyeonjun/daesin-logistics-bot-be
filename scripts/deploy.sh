@@ -145,8 +145,8 @@ echo -e "   대시보드: http://localhost:8080/dashboard/"
 echo ""
 echo -e "${YELLOW}💡 롤백하려면:${NC}"
 if [ "$NEXT" = "green" ]; then
-    echo -e "   BLUE_ENABLED=true GREEN_ENABLED=false docker compose up -d"
+    echo -e "   docker compose up -d app-blue && ./switch-traffic.sh blue"
 else
-    echo -e "   BLUE_ENABLED=false GREEN_ENABLED=true docker compose up -d"
+    echo -e "   docker compose up -d app-green && ./switch-traffic.sh green"
 fi
 echo ""
