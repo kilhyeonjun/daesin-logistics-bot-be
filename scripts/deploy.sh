@@ -73,6 +73,9 @@ fi
 echo -e "${BLUE}🔨 새 이미지 빌드 중...${NC}"
 docker compose build $NO_CACHE
 
+echo -e "${BLUE}⏰ 단일 수집 스케줄러 갱신 중...${NC}"
+docker compose up -d scheduler
+
 # 3. Traefik 실행 확인
 if ! docker compose ps --format json 2>/dev/null | grep -q '"Name":"traefik".*"State":"running"'; then
     echo -e "${BLUE}🔧 Traefik 시작 중...${NC}"
@@ -114,12 +117,7 @@ done
 
 # 6. 트래픽 전환
 echo -e "${BLUE}🔄 트래픽을 ${NEXT}로 전환 중...${NC}"
-if [ "$NEXT" = "green" ]; then
-    export BLUE_ENABLED=false GREEN_ENABLED=true
-else
-    export BLUE_ENABLED=true GREEN_ENABLED=false
-fi
-docker compose up -d
+./switch-traffic.sh "$NEXT"
 
 # 7. 전환 확인
 sleep 3

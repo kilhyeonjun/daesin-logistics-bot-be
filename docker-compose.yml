@@ -37,6 +37,7 @@ services:
       - "logistics.ds3211.co.kr:211.51.241.159"
     environment:
       - NODE_ENV=production
+      - TZ=Asia/Seoul
       - PORT=3000
       - DATABASE_URL=file:/app/data/logistics.db
       - API_KEY=${API_KEY}
@@ -55,6 +56,23 @@ services:
   app-green:
     <<: *app-base
     container_name: app-green
+
+  scheduler:
+    build: .
+    container_name: scheduler
+    restart: unless-stopped
+    command: ["node", "dist/scheduler.js"]
+    volumes:
+      - ./data:/app/data
+    extra_hosts:
+      - "logistics.ds3211.co.kr:211.51.241.159"
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Seoul
+      - DATABASE_URL=file:/app/data/logistics.db
+      - API_KEY=${API_KEY}
+    networks:
+      - app-network
 
 networks:
   app-network:

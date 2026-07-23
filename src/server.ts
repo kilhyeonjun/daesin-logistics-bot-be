@@ -1,9 +1,7 @@
 import 'reflect-metadata';
-import cron from 'node-cron';
-import { configureContainer, container, disconnectDatabase } from './config/container.js';
+import { configureContainer, disconnectDatabase } from './config/container.js';
 import { config, isTest } from './config/environment.js';
 import { createApp } from './app.js';
-import { SyncRoutesUseCase } from './application/use-cases/SyncRoutesUseCase.js';
 
 async function bootstrap(): Promise<void> {
   // Configure DI container
@@ -19,23 +17,6 @@ async function bootstrap(): Promise<void> {
       console.log(`카카오톡 스킬 URL: POST /kakao/skill`);
     });
 
-    // Initial sync
-    try {
-      const syncUseCase = container.resolve(SyncRoutesUseCase);
-      await syncUseCase.execute();
-    } catch (error) {
-      console.error('초기 동기화 실패:', error);
-    }
-
-    // Schedule sync: Every hour from 6 AM to 8 PM, Monday to Saturday
-    cron.schedule('0 6-20 * * 1-6', async () => {
-      try {
-        const syncUseCase = container.resolve(SyncRoutesUseCase);
-        await syncUseCase.execute();
-      } catch (error) {
-        console.error('예약 동기화 실패:', error);
-      }
-    });
   }
 
   // Graceful shutdown
