@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { validateEnvironment } from '../src/config/environment.js';
 
 describe('validateEnvironment', () => {
@@ -14,7 +15,12 @@ describe('validateEnvironment', () => {
     );
   });
 
-  it('test에서는 인증 secret 없이 시작할 수 있다', () => {
+  it('test에서는 API_KEY와 JWT_SECRET 없이 시작할 수 있다', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'test' })).not.toThrow();
+  });
+
+  it('production app 컨테이너에 JWT_SECRET을 전달한다', () => {
+    const compose = readFileSync('docker-compose.yml', 'utf8');
+    expect(compose).toContain('- JWT_SECRET=${JWT_SECRET}');
   });
 });
