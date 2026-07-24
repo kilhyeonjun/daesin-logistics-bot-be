@@ -21,6 +21,7 @@ export class PrismaMigrationJobRepository implements IMigrationJobRepository {
         totalDays: job.totalDays,
         completedDays: job.completedDays,
         errorMessage: job.errorMessage,
+        createdAt: new Date().toISOString(),
       },
     });
     return this.toDomain(record);

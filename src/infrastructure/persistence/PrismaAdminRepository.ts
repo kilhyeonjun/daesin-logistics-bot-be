@@ -31,6 +31,7 @@ export class PrismaAdminRepository implements IAdminRepository {
         email: admin.email,
         passwordHash: admin.passwordHash,
         name: admin.name,
+        createdAt: new Date().toISOString(),
       },
     });
     return this.toDomain(record);

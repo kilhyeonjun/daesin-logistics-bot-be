@@ -5,9 +5,12 @@ import 'reflect-metadata';
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3001';
 process.env.DATABASE_URL = 'file:./logistics.db';
+process.env.API_KEY = 'test-api-key';
+process.env.JWT_SECRET = 'test-jwt-secret';
 
-import { configureContainer, disconnectDatabase } from '../src/config/container.js';
 import { afterAll } from 'vitest';
+
+const { configureContainer, disconnectDatabase } = await import('../src/config/container.js');
 
 // 컨테이너 즉시 설정
 configureContainer();

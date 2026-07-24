@@ -14,7 +14,6 @@ async function bootstrap(): Promise<void> {
   if (!isTest) {
     app.listen(config.port, () => {
       console.log(`서버 시작: http://localhost:${config.port}`);
-      console.log(`카카오톡 스킬 URL: POST /kakao/skill`);
     });
 
   }

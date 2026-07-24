@@ -30,6 +30,7 @@ async function main() {
         email,
         passwordHash,
         name,
+        createdAt: new Date().toISOString(),
       },
     });
 

@@ -3,6 +3,9 @@ import { container } from '../src/config/container.js';
 import { TOKENS } from '../src/config/tokens.js';
 import type { IRouteRepository } from '../src/domain/repositories/IRouteRepository.js';
 import { Route } from '../src/domain/entities/Route.js';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 describe('Database (PrismaRouteRepository)', () => {
   let repository: IRouteRepository;
@@ -26,6 +29,29 @@ describe('Database (PrismaRouteRepository)', () => {
   });
 
   describe('upsertMany', () => {
+    it('신규 행의 createdAt을 실제 ISO 시각으로 저장한다', async () => {
+      await prisma.route.deleteMany({
+        where: { searchDate: '20990101', lineCode: '999997' },
+      });
+      const newRoute = Route.create({
+        searchDate: '20990101',
+        lineCode: '999997',
+        lineName: '타임스탬프 테스트',
+        carCode: null,
+        carNumber: null,
+        count: 1,
+        quantity: 1,
+        sectionFare: 0,
+        totalFare: 0,
+      });
+
+      await repository.upsertMany([newRoute]);
+      const [saved] = await repository.findByLineCode('999997');
+
+      expect(saved.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(Number.isNaN(Date.parse(saved.createdAt ?? ''))).toBe(false);
+    });
+
     it('데이터 삽입 성공', async () => {
       const newRoute = Route.create({
         searchDate: '20251220',

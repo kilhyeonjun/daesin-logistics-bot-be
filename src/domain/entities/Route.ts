@@ -12,7 +12,6 @@ export interface RouteProps {
   createdAt?: string;
   raceInfoUrl?: string | null;
   carDetailUrl?: string | null;
-  trackingUrl?: string | null;
   waypointUrl?: string | null;
 }
 
@@ -30,7 +29,6 @@ export class Route {
   readonly createdAt?: string;
   readonly raceInfoUrl: string | null;
   readonly carDetailUrl: string | null;
-  readonly trackingUrl: string | null;
   readonly waypointUrl: string | null;
 
   constructor(props: RouteProps) {
@@ -47,7 +45,6 @@ export class Route {
     this.createdAt = props.createdAt;
     this.raceInfoUrl = props.raceInfoUrl ?? null;
     this.carDetailUrl = props.carDetailUrl ?? null;
-    this.trackingUrl = props.trackingUrl ?? null;
     this.waypointUrl = props.waypointUrl ?? null;
   }
 

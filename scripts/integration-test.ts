@@ -4,10 +4,30 @@
  * - CommonJS/ESM 호환성 문제 조기 발견
  */
 import { spawn, ChildProcess } from 'child_process';
+import { randomBytes } from 'node:crypto';
 import http from 'http';
+import net from 'node:net';
 
-const PORT = 3001;
-const BASE_URL = `http://localhost:${PORT}`;
+const INTEGRATION_API_KEY = randomBytes(24).toString('hex');
+
+let PORT = 0;
+let BASE_URL = '';
+
+async function findAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      if (!address || typeof address === 'string') {
+        probe.close();
+        reject(new Error('사용 가능한 포트를 찾지 못했습니다'));
+        return;
+      }
+      probe.close((error) => error ? reject(error) : resolve(address.port));
+    });
+  });
+}
 
 interface TestResult {
   name: string;
@@ -25,12 +45,15 @@ function request(
 ): Promise<{ status: number; body: unknown }> {
   return new Promise((resolve, reject) => {
     const url = new URL(path, BASE_URL);
+    const headers: http.OutgoingHttpHeaders = {};
+    if (body) headers['Content-Type'] = 'application/json';
+    headers['x-api-key'] = INTEGRATION_API_KEY;
     const options: http.RequestOptions = {
       method,
       hostname: url.hostname,
       port: url.port,
       path: url.pathname,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers,
     };
 
     const req = http.request(options, (res) => {
@@ -88,29 +111,9 @@ async function runTests(): Promise<void> {
     if (body.status !== 'ok') throw new Error(`body.status: ${body.status}`);
   });
 
-  await test('POST /kakao/skill - 도움말', async () => {
-    const res = await request('POST', '/kakao/skill', {
-      userRequest: { utterance: '도움말' },
-    });
-    if (res.status !== 200) throw new Error(`status: ${res.status}`);
-    const body = res.body as { version: string; template: { outputs: Array<{ simpleText?: { text: string } }> } };
-    if (body.version !== '2.0') throw new Error(`version: ${body.version}`);
-    if (!body.template.outputs[0].simpleText?.text.includes('도움말')) {
-      throw new Error('도움말 텍스트 미포함');
-    }
-  });
 
-  await test('POST /kakao/skill - 노선 검색', async () => {
-    const res = await request('POST', '/kakao/skill', {
-      userRequest: { utterance: '노선 101102' },
-    });
-    if (res.status !== 200) throw new Error(`status: ${res.status}`);
-    const body = res.body as { version: string };
-    if (body.version !== '2.0') throw new Error(`version: ${body.version}`);
-  });
-
-  await test('GET /api/routes/code/101102 - API 검색', async () => {
-    const res = await request('GET', '/api/routes/code/101102');
+  await test('GET /api/routes/date/20990101 - 인증된 빈 날짜 조회', async () => {
+    const res = await request('GET', '/api/routes/date/20990101');
     if (res.status !== 200) throw new Error(`status: ${res.status}`);
     if (!Array.isArray(res.body)) throw new Error('응답이 배열이 아님');
   });
@@ -122,9 +125,16 @@ async function main(): Promise<void> {
 
   // 서버 시작
   // 참고: NODE_ENV=test이면 서버가 시작되지 않으므로 integration 사용
-  console.log('서버 시작 중...');
-  const server: ChildProcess = spawn('node', ['dist/app.js'], {
-    env: { ...process.env, NODE_ENV: 'integration', PORT: String(PORT) },
+  PORT = await findAvailablePort();
+  BASE_URL = `http://127.0.0.1:${PORT}`;
+  console.log(`서버 시작 중... (127.0.0.1:${PORT})`);
+  const server: ChildProcess = spawn('node', ['dist/server.js'], {
+    env: {
+      ...process.env,
+      API_KEY: INTEGRATION_API_KEY,
+      NODE_ENV: 'integration',
+      PORT: String(PORT),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 

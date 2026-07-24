@@ -1,13 +1,16 @@
-# 대신물류 배차현황 카카오톡 챗봇
+# 대신물류 배차현황 웹 백엔드
 
-대신물류 배차현황 데이터를 크롤링하여 카카오톡 챗봇으로 조회할 수 있는 서비스입니다.
+대신물류 배차현황을 수집하고 웹 프론트엔드에 조회 API를 제공하는 백엔드입니다.
+
+- 공개 프론트엔드: https://daesin.kilpenguin.com
+- 프론트엔드 저장소: https://github.com/kilhyeonjun/daesin-logistics-bot-fe
 
 ## 주요 기능
 
-- **자동 크롤링**: 월~토 오전 6시, 오후 2시 배차현황 자동 수집
+- **자동 수집**: 월~토 06:00~20:00 KST, 매시 정각 배차현황 수집
 - **데이터 저장**: SQLite DB에 저장 및 이력 관리
-- **카카오톡 챗봇**: 노선코드, 차량번호, 도착지 검색
-- **REST API**: 외부 시스템 연동용 API 제공
+- **웹 조회**: 노선코드, 차량번호, 도착지 검색 및 통계 API 제공
+- **안전한 운영**: 단일 스케줄러와 Blue-Green 수동 롤백
 
 ## 기술 스택
 
@@ -40,8 +43,7 @@ src/
 │   ├── persistence/  # PrismaRouteRepository
 │   └── crawling/     # CheerioHttpCrawler
 ├── interface/        # 진입점
-│   ├── http/         # REST API 컨트롤러
-│   └── kakao/        # 카카오 스킬 서버
+│   └── http/         # REST API 컨트롤러
 └── config/           # DI 컨테이너, 환경설정
 ```
 
@@ -93,6 +95,7 @@ docker logs -f daesin-logistics-bot
 | `PORT` | 서버 포트 | `3000` |
 | `NODE_ENV` | 실행 환경 | `development` |
 | `DATABASE_URL` | SQLite DB 경로 | `file:/app/data/logistics.db` |
+| `API_KEY` | API 요청 키 (`production`에서 필수) | 없음 |
 
 ---
 
@@ -139,12 +142,12 @@ npx prisma generate
 
 ## 스케줄링
 
-node-cron을 사용하여 서버 프로세스 내부에서 스케줄링됩니다.
+웹 복제본과 분리된 `scheduler` 컨테이너 하나가 `Asia/Seoul` 기준으로 수집을 실행합니다.
 
 | 스케줄 | 시간 | 설명 |
 |--------|------|------|
 | 월~토 | 오전 6시 ~ 오후 8시 | 매시 정각 크롤링 (1시간 간격) |
-| 서버 시작 | 즉시 | 초기 동기화 1회 실행 |
+| 스케줄러 시작 | 즉시 | 초기 동기화 1회 실행 |
 
 ```typescript
 // cron 표현식: 0 6-20 * * 1-6
@@ -153,11 +156,17 @@ cron.schedule('0 6-20 * * 1-6', async () => {
 });
 ```
 
-컨테이너가 재시작되어도 스케줄은 자동으로 다시 등록됩니다.
+Blue/Green 웹 복제본에는 스케줄러가 없으므로 배포 중에도 예약 작업이 중복 실행되지 않습니다.
 
 ---
 
 ## API 엔드포인트
+
+`/health`를 제외한 모든 API 요청에는 서버 간 `x-api-key`가 필요합니다. 관리 API는 로그인으로 발급된 `Authorization: Bearer <token>`도 함께 요구합니다.
+
+```bash
+curl -H 'x-api-key: <API_KEY>' http://localhost/api/routes/date/20260124
+```
 
 ### 헬스체크
 
@@ -198,41 +207,12 @@ GET /api/stats/:date
 
 ```
 POST /api/sync
+x-api-key: <API_KEY>
+Authorization: Bearer <ADMIN_TOKEN>
 Content-Type: application/json
 
 {"date": "20260124"}
 ```
-
-### 카카오 스킬
-
-```
-POST /kakao/skill
-```
-
----
-
-## 카카오톡 챗봇
-
-### 명령어
-
-| 명령어 | 설명 | 예시 |
-|--------|------|------|
-| `노선 {코드}` | 노선코드로 검색 | 노선 101102 |
-| `차량 {번호}` | 차량번호로 검색 | 차량 4536 |
-| `도착 {지역}` | 노선명/도착지로 검색 | 도착 연희동 |
-| `오늘 현황` | 오늘 전체 현황 | 오늘 현황 |
-| `어제 현황` | 어제 전체 현황 | 어제 현황 |
-| `도움말` | 사용법 보기 | 도움말 |
-
-### 카카오 채널 연동
-
-1. [카카오 비즈니스](https://business.kakao.com) 가입 및 채널 생성
-2. [카카오 i 오픈빌더](https://i.kakao.com) 접속
-3. 봇 생성 후 스킬 등록
-   - 스킬 URL: `https://your-domain.com/kakao/skill`
-4. 시나리오 블록에 스킬 연결
-
----
 
 ## Docker 운영
 
@@ -250,6 +230,7 @@ localhost:80
 Traefik (리버스 프록시)
   ├── app-blue (활성)   ─┐
   └── app-green (대기)  ─┴── SQLite DB (./data)
+scheduler (singleton, KST) ────┘
 ```
 
 | 컴포넌트 | 역할 | 포트 |
@@ -257,6 +238,7 @@ Traefik (리버스 프록시)
 | Traefik | 리버스 프록시, 라우팅, 헬스체크 | 80 (웹), 8080 (대시보드) |
 | app-blue | 프로덕션 서비스 (Blue) | 3000 (내부) |
 | app-green | 프로덕션 서비스 (Green) | 3000 (내부) |
+| scheduler | 초기 1회 + 월~토 06:00~20:00 KST 수집 | 없음 |
 
 ### 명령어
 
@@ -275,9 +257,9 @@ docker logs -f traefik
 open http://localhost:8080/dashboard/
 ```
 
-### 무중단 배포 (Zero-Downtime Deployment)
+### Blue-Green 배포
 
-Blue-Green 배포 전략으로 무중단 배포를 지원합니다.
+비활성 슬롯을 먼저 검증한 뒤 Traefik 라우팅을 전환합니다. 실제 다운타임 0초를 보장하는 표현은 사용하지 않습니다.
 
 #### 자동 배포 스크립트
 
@@ -286,33 +268,31 @@ Blue-Green 배포 전략으로 무중단 배포를 지원합니다.
 ./scripts/deploy.sh
 ```
 
-스크립트가 자동으로:
+스크립트는 `traefik/dynamic.yml`의 실제 라우팅 대상을 기준으로:
 1. 최신 코드 pull
 2. 새 이미지 빌드
-3. 비활성 서비스(Blue/Green) 시작
-4. 헬스체크 대기
-5. 트래픽 전환
-6. 이전 서비스 정리
+3. 비활성 서비스 시작
+4. 후보 슬롯 헬스체크
+5. 트래픽 전환 및 라우팅 헬스체크
+6. singleton 스케줄러 갱신
+7. 이전 서비스 정리
+
+전환 후 헬스체크가 실패하면 이전 서비스를 중지하지 않고 종료합니다. 원인 확인 후 아래 명령으로 **수동 롤백**합니다.
 
 #### 수동 Blue-Green 전환
 
 ```bash
-# 현재 상태 확인
-docker compose ps
+# 현재 Traefik 라우팅 대상 확인
+./switch-traffic.sh status
 
-# Blue → Green 전환
-BLUE_ENABLED=false GREEN_ENABLED=true docker compose up -d
+# 예: Green에서 Blue로 수동 롤백
+docker compose up -d app-blue
+./switch-traffic.sh blue
 
-# Green → Blue 롤백
-BLUE_ENABLED=true GREEN_ENABLED=false docker compose up -d
+# 예: Blue에서 Green으로 수동 롤백
+docker compose up -d app-green
+./switch-traffic.sh green
 ```
-
-#### 환경변수
-
-| 변수 | 기본값 | 설명 |
-|------|--------|------|
-| `BLUE_ENABLED` | `true` | Blue 서비스 활성화 |
-| `GREEN_ENABLED` | `false` | Green 서비스 활성화 |
 
 ### Tailscale Funnel 설정
 

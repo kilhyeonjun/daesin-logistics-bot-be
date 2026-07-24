@@ -4,7 +4,6 @@ import { RouteController } from '../controllers/RouteController.js';
 import { SyncController } from '../controllers/SyncController.js';
 import { MigrationController } from '../controllers/MigrationController.js';
 import { AuthController } from '../controllers/AuthController.js';
-import { KakaoSkillController } from '../../kakao/KakaoSkillController.js';
 import { apiKeyAuth } from '../../../shared/middleware/apiKeyAuth.js';
 import { adminAuth } from '../../../shared/middleware/adminAuth.js';
 
@@ -15,7 +14,6 @@ export function createRoutes(): Router {
   const syncController = container.resolve(SyncController);
   const migrationController = new MigrationController();
   const authController = container.resolve(AuthController);
-  const kakaoController = container.resolve(KakaoSkillController);
 
   // Health check
   router.get('/health', (req, res) => syncController.health(req, res));
@@ -24,7 +22,7 @@ export function createRoutes(): Router {
   router.get('/api/auth/me', apiKeyAuth, adminAuth, (req, res) => authController.me(req, res));
 
   // Sync
-  router.post('/api/sync', apiKeyAuth, (req, res) => syncController.sync(req, res));
+  router.post('/api/sync', apiKeyAuth, adminAuth, (req, res) => syncController.sync(req, res));
 
   // Route search APIs
   router.get('/api/routes/code/:code', apiKeyAuth, (req, res) => routeController.findByCode(req, res));
@@ -39,9 +37,6 @@ export function createRoutes(): Router {
   router.get('/api/migration/active', apiKeyAuth, adminAuth, (req, res) => migrationController.getActiveJob(req, res));
   router.get('/api/migration/:id', apiKeyAuth, adminAuth, (req, res) => migrationController.getJob(req, res));
   router.delete('/api/migration/:id', apiKeyAuth, adminAuth, (req, res) => migrationController.cancelJob(req, res));
-
-  // Kakao skill webhook
-  router.post('/kakao/skill', apiKeyAuth, (req, res) => kakaoController.handleSkill(req, res));
 
   return router;
 }

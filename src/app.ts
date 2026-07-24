@@ -9,7 +9,7 @@ export function createApp(): Express {
     origin: [
       'http://localhost:3000',
       'http://localhost:3001',
-      /\.vercel\.app$/,
+      'https://daesin.kilpenguin.com',
     ],
     credentials: true,
   }));

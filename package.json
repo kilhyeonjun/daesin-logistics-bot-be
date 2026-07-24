@@ -2,7 +2,7 @@
   "name": "logistics-bot",
   "version": "1.0.0",
   "type": "module",
-  "description": "대신물류 배차현황 크롤링 및 카카오톡 챗봇",
+  "description": "대신물류 배차현황 수집 및 조회 API",
   "main": "dist/server.js",
   "scripts": {
     "build": "prisma generate && tsc",

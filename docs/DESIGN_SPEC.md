@@ -730,10 +730,6 @@ terminals: [
 ### 11.6 외부 연동 API
 
 ```javascript
-// 차량 관제 (GPS 위치)
-// custom.ds3211.co.kr - 별도 API
-const gpsUrl = `http://custom.ds3211.co.kr/vcSvl?apiKey=[REDACTED]&carNumber=${carNo}`;
-
 // 경유지 정보 (모바일 버전 존재)
 const waypointUrl = `http://www.ds3211.co.kr/mobile/loadPlan/list.jsp?inputDate=${date}&streetCode=${lineCode}`;
 ```

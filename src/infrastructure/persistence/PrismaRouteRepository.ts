@@ -128,6 +128,7 @@ export class PrismaRouteRepository implements IRouteRepository {
         create: {
           searchDate: route.searchDate,
           lineCode: route.lineCode,
+          createdAt: new Date().toISOString(),
           lineName: route.lineName,
           carCode: route.carCode,
           carNumber: route.carNumber,
@@ -137,7 +138,6 @@ export class PrismaRouteRepository implements IRouteRepository {
           totalFare: route.totalFare,
           raceInfoUrl: route.raceInfoUrl,
           carDetailUrl: route.carDetailUrl,
-          trackingUrl: route.trackingUrl,
           waypointUrl: route.waypointUrl,
         },
         update: {
@@ -150,7 +150,6 @@ export class PrismaRouteRepository implements IRouteRepository {
           totalFare: route.totalFare,
           raceInfoUrl: route.raceInfoUrl,
           carDetailUrl: route.carDetailUrl,
-          trackingUrl: route.trackingUrl,
           waypointUrl: route.waypointUrl,
         },
       })
@@ -174,7 +173,6 @@ export class PrismaRouteRepository implements IRouteRepository {
     createdAt: string | null;
     raceInfoUrl: string | null;
     carDetailUrl: string | null;
-    trackingUrl: string | null;
     waypointUrl: string | null;
   }): Route {
     return new Route({
@@ -191,7 +189,6 @@ export class PrismaRouteRepository implements IRouteRepository {
       createdAt: record.createdAt ?? undefined,
       raceInfoUrl: record.raceInfoUrl,
       carDetailUrl: record.carDetailUrl,
-      trackingUrl: record.trackingUrl,
       waypointUrl: record.waypointUrl,
     });
   }

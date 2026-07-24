@@ -13,7 +13,6 @@ export interface RouteDto {
   totalFare: number;
   raceInfoUrl: string | null;
   carDetailUrl: string | null;
-  trackingUrl: string | null;
   waypointUrl: string | null;
 }
 
@@ -50,7 +49,6 @@ export class RouteMapper {
       totalFare: route.totalFare,
       raceInfoUrl: route.raceInfoUrl,
       carDetailUrl: route.carDetailUrl,
-      trackingUrl: route.trackingUrl,
       waypointUrl: route.waypointUrl,
     };
   }

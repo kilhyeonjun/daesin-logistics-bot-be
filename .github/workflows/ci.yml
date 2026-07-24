@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: file:./logistics.db
+      API_KEY: ci-test-api-key
+      JWT_SECRET: ci-test-jwt-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma db push --skip-generate
+      # Live crawler probes are verified from the production host, not GitHub-hosted CI.
+      - run: npm test -- --exclude tests/crawler.test.ts
+      - run: npm run build
+      - run: bash tests/deploy-blue-green.test.sh
+      - run: docker compose config --quiet
+      - run: npm audit --omit=dev --audit-level=high

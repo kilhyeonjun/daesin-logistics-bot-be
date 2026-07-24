@@ -14,8 +14,6 @@ const iconv = iconvModule as unknown as {
 const BASE_URL = 'http://logistics.ds3211.co.kr/daesin/servlet/total.TotServlet';
 const RACE_INFO_BASE = 'http://logistics.ds3211.co.kr/daesin/jsp/zraceInfo/mobile/raceInfoPopup.jsp';
 const CAR_DETAIL_BASE = 'http://logistics.ds3211.co.kr/daesin/jsp/total/lineGoodsTot_detail.jsp';
-const TRACKING_BASE = 'http://custom.ds3211.co.kr/vcSvl';
-const TRACKING_API_KEY = '[REDACTED]';
 const WAYPOINT_BASE = 'http://www.ds3211.co.kr/mobile/loadPlan/list.jsp';
 
 @injectable()
@@ -91,7 +89,6 @@ export class CheerioHttpCrawler implements ICrawler {
             totalFare: this.parseNumber($(cols[9]).text()),
             raceInfoUrl: carCode ? `${RACE_INFO_BASE}?carNumber=${carCode}` : null,
             carDetailUrl: carCode ? `${CAR_DETAIL_BASE}?carcode=${carCode}` : null,
-            trackingUrl: carNumber ? `${TRACKING_BASE}?apiKey=${TRACKING_API_KEY}&carNumber=${encodeURIComponent(carNumber)}` : null,
             waypointUrl: `${WAYPOINT_BASE}?inputDate=${searchDate}&streetCode=${lineCode}`,
           });
 
