@@ -33,21 +33,7 @@ export class SearchDate {
   }
 
   static defaultForCrawling(): SearchDate {
-    const now = new Date();
-    const hour = now.getHours();
-    const day = now.getDay();
-
-    if (hour < 14) {
-      if (day === 1) {
-        now.setDate(now.getDate() - 3);
-      } else if (day === 0) {
-        now.setDate(now.getDate() - 2);
-      } else {
-        now.setDate(now.getDate() - 1);
-      }
-    }
-
-    return SearchDate.fromDate(now);
+    return SearchDate.today();
   }
 
   getValue(): string {
