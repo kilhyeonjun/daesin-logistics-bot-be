@@ -19,8 +19,8 @@ describe('validateEnvironment', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'test' })).not.toThrow();
   });
 
-  it('production app 컨테이너에 JWT_SECRET을 전달한다', () => {
+  it('production app와 scheduler 컨테이너에 JWT_SECRET을 전달한다', () => {
     const compose = readFileSync('docker-compose.yml', 'utf8');
-    expect(compose).toContain('- JWT_SECRET=${JWT_SECRET}');
+    expect(compose.match(/- JWT_SECRET=\$\{JWT_SECRET\}/g)).toHaveLength(2);
   });
 });

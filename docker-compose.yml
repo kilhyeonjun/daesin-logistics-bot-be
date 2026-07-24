@@ -74,6 +74,7 @@ services:
       - TZ=Asia/Seoul
       - DATABASE_URL=file:/app/data/logistics.db
       - API_KEY=${API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
     networks:
       - app-network
 
