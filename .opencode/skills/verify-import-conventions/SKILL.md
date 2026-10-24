@@ -28,7 +28,6 @@ description: ESM import 규칙을 검증합니다. .js 확장자, reflect-metada
 | `src/domain/value-objects/LineCode.ts` | 도메인 내부 import 예시 |
 | `src/domain/repositories/IRouteRepository.ts` | type import 대상 파일 |
 | `src/domain/ports/ICrawler.ts` | type import 대상 파일 |
-| `src/domain/ports/ICacheService.ts` | type import 대상 파일 |
 | `tsconfig.json` | module: NodeNext 설정 (ESM 요구) |
 | `package.json` | "type": "module" 설정 |
 

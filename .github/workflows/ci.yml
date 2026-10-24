@@ -25,9 +25,25 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx prisma db push --skip-generate
-      # Live crawler probes are verified from the production host, not GitHub-hosted CI.
-      - run: npm test -- --exclude tests/crawler.test.ts
+      - run: npm test
       - run: npm run build
+      - run: npm run verify:ingestion
       - run: bash tests/deploy-blue-green.test.sh
       - run: docker compose config --quiet
       - run: npm audit --omit=dev --audit-level=high
+      - name: Build production image without deploying
+        run: docker build --tag daesin-quality-ci .
+      - name: Verify production Prisma runtime with isolated SQLite
+        run: |
+          docker run --rm --entrypoint node -e DATABASE_URL=file:/tmp/quality.sqlite daesin-quality-ci --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { PrismaClient, Prisma } from "@prisma/client";
+            const [major, minor, patch] = process.versions.node.split(".").map(Number);
+            assert(major > 20 || (major === 20 && (minor > 18 || (minor === 18 && patch >= 1))));
+            const db = new PrismaClient();
+            try {
+              const rows = await db.$queryRawUnsafe("SELECT 1 AS result");
+              assert.equal(Number(rows[0].result), 1);
+              console.log(JSON.stringify({ node: process.versions.node, prisma: Prisma.prismaVersion, sqliteQuery: "passed" }));
+            } finally { await db.$disconnect(); }
+          '

@@ -62,8 +62,6 @@ export class CheerioHttpCrawler implements ICrawler {
 
       $('table.tab1').each((_i, table) => {
         const rows = $(table).find('tr');
-        if (rows.length < 5) return;
-
         const firstRow = $(rows[0]).text();
         if (!firstRow.includes('노선코드')) return;
 
@@ -83,8 +81,8 @@ export class CheerioHttpCrawler implements ICrawler {
             lineName: $(cols[1]).text().trim() || null,
             carCode: carCode,
             carNumber: carNumber,
-            count: parseInt($(cols[6]).text().trim()) || 0,
-            quantity: parseInt($(cols[7]).text().trim()) || 0,
+            count: parseInt($(cols[6]).text().replace(/,/g, '').trim()) || 0,
+            quantity: parseInt($(cols[7]).text().replace(/,/g, '').trim()) || 0,
             sectionFare: this.parseNumber($(cols[8]).text()),
             totalFare: this.parseNumber($(cols[9]).text()),
             raceInfoUrl: carCode ? `${RACE_INFO_BASE}?carNumber=${carCode}` : null,
