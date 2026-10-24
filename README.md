@@ -390,11 +390,13 @@ Prisma 6을 유지하면서 `@prisma/config@6.19.3`의 `deepmerge-ts`만 `8.0.2`
 
 ## CI 런타임·이미지 빌드
 
-GitHub Actions 자체는 Node 24 기반 `checkout@v7.0.1`, `setup-node@v7.1.0`, `setup-buildx-action@v4.4.1`, `build-push-action@v7.4.0`을 사용합니다. 테스트에서 선택하는 Node 20과 Docker의 `node:20-alpine`은 별개이며 변경하지 않았습니다.
+GitHub Actions 자체는 Node 24 기반 `checkout@v7.0.1`, `setup-node@v7.1.0`을 사용합니다. 테스트에서 선택하는 Node 20과 Docker의 `node:20-alpine`은 별개이며 변경하지 않았습니다.
 
-Docker 이미지는 체크아웃된 디렉터리에서 빌드해 현재 CI runner에만 로드합니다. registry push나 운영 배포는 하지 않습니다. `gha` 캐시는 `daesin-quality-ci-linux-amd64` 범위로 builder·runner 중간 계층까지 저장하며, 접근 범위는 GitHub의 브랜치/PR cache 격리를 따릅니다. 추가 PAT·registry 자격 증명은 사용하지 않습니다. builder의 Prisma 생성은 `npm run build`에 포함된 한 번만 명시적으로 실행하고, 별도로 의존성을 설치하는 runner 단계의 생성은 유지합니다.
+Docker 이미지는 체크아웃된 디렉터리에서 `docker build`로 빌드합니다. registry push나 운영 배포는 하지 않습니다. Buildx의 `gha` 계층 캐시는 [동일 revision 실험](https://github.com/kilhyeonjun/daesin-logistics-bot-be/actions/runs/40056863732)에서 최초·재사용 job이 각각 162초·160초였고, 캐시 export만 65.4초·67.2초를 차지해 채택하지 않았습니다. 비교 기준 main job은 69초였습니다. 이는 해당 runner 실행의 관측값이며 일반적인 캐시 성능을 뜻하지 않습니다.
 
-캐시가 비어 있거나 축출되면 전체 빌드가 필요합니다. 성능은 같은 revision의 최초·재사용 실행에서 캐시 적중과 빌드 단계·전체 job 시간을 함께 확인해야 하며, 캐시 설정만으로 단축을 주장하지 않습니다. 캐시 사용 여부와 관계없이 기능 테스트, 전체 의존성 감사와 최종 이미지의 실제 Prisma/SQLite 쿼리를 유지합니다. 이 CI는 Linux amd64 검증이며, ARM 운영 반영 증거를 대신하지 않습니다.
+두 빌드 단계에는 `prisma/schema.prisma`만 복사해 생성된 SQLite 파일을 이미지 입력에서 제외합니다. builder의 Prisma 생성은 `npm run build`에 포함된 한 번만 명시적으로 실행하고, 별도로 의존성을 설치하는 runner 단계의 생성은 유지합니다. 최종 이미지의 코드·의존성은 root 소유로 두고 SQLite 디렉터리 `/app/data`만 비-root 앱 사용자가 소유합니다. 전체 `/app`의 재귀적 소유권 변경과 그에 따른 계층 복사를 피합니다.
+
+기능 테스트와 전체 의존성 감사를 유지하며, 최종 이미지의 기본 비-root 사용자로 `/app/data`에 임시 SQLite 테이블 생성·삽입·조회를 실행합니다. 이 컨테이너에는 운영 볼륨을 연결하지 않습니다. 따라서 이미지 내부 쓰기 권한은 검증하지만 실제 bind mount의 호스트 권한은 별도 운영 확인 대상입니다. 이 CI는 Linux amd64 검증이며, ARM 운영 반영 증거를 대신하지 않습니다.
 
 ## 라이선스
 
