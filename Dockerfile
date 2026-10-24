@@ -15,7 +15,7 @@ COPY tsconfig.json ./
 COPY src ./src/
 
 # Generate Prisma client and build TypeScript
-RUN npx prisma generate && npm run build
+RUN npm run build
 
 # Production stage
 FROM node:20-alpine AS runner

@@ -144,10 +144,10 @@ echo -e "   활성 서비스: ${GREEN}${NEXT}${NC}"
 echo -e "   접속 URL: http://localhost:80"
 echo -e "   대시보드: http://localhost:8080/dashboard/"
 echo ""
-echo -e "${YELLOW}💡 롤백하려면:${NC}"
+echo -e "${YELLOW}💡 기존 컨테이너로 웹 트래픽만 되돌리려면:${NC}"
 if [ "$NEXT" = "green" ]; then
-    echo -e "   docker compose up -d app-blue && ./switch-traffic.sh blue"
+    echo -e "   docker start app-blue && ./switch-traffic.sh blue"
 else
-    echo -e "   docker compose up -d app-green && ./switch-traffic.sh green"
+    echo -e "   docker start app-green && ./switch-traffic.sh green"
 fi
 echo ""

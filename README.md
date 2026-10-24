@@ -281,16 +281,18 @@ open http://localhost:8080/dashboard/
 
 #### 수동 Blue-Green 전환
 
+아래 롤백 명령은 이전 컨테이너가 삭제·재생성되지 않았고, 그 컨테이너의 이미지 ID가 배포 전 기록과 일치할 때 사용합니다. `docker compose up`은 새 이미지로 컨테이너를 재생성할 수 있으므로 이전 버전 복구를 보장하지 않습니다. 웹 라우팅 전환은 scheduler 이미지나 DB의 복구와 별개입니다. 운영 `traefik/dynamic.yml`의 변경은 현재 라우팅 상태일 수 있으므로 Git 정리 작업으로 덮어쓰지 않습니다.
+
 ```bash
 # 현재 Traefik 라우팅 대상 확인
 ./switch-traffic.sh status
 
 # 예: Green에서 Blue로 수동 롤백
-docker compose up -d app-blue
+docker start app-blue
 ./switch-traffic.sh blue
 
 # 예: Blue에서 Green으로 수동 롤백
-docker compose up -d app-green
+docker start app-green
 ./switch-traffic.sh green
 ```
 
@@ -308,10 +310,17 @@ tailscale funnel off localhost:3000
 
 ### 데이터 백업
 
+실행 중인 SQLite의 본체 파일만 `cp`하면 WAL에 남은 변경을 놓칠 수 있습니다. SQLite backup API로 고유한 스냅샷을 만들고, 백업 파일 자체를 검사합니다. 아래 경로는 실제 운영 volume 경로와 대조한 뒤 사용합니다.
+
 ```bash
-# DB 파일 백업
-cp ./data/logistics.db ./backup/logistics_$(date +%Y%m%d).db
+umask 077
+mkdir -p ./backup
+BACKUP_DIR=$(mktemp -d ./backup/predeploy.XXXXXX)
+sqlite3 -readonly ./data/logistics.db ".backup '$BACKUP_DIR/logistics.db'"
+sqlite3 "$BACKUP_DIR/logistics.db" 'PRAGMA journal_mode=DELETE; PRAGMA integrity_check;'
 ```
+
+백업 파일과 디렉터리는 각각 0600·0700으로 보관하고 저장소나 공개 CI artifact에 올리지 않습니다. 운영 반영 전에는 별도 경로에 백업을 복사해 체크섬·무결성·조회까지 확인합니다. 이 검증은 운영 DB를 덮어쓰는 복구나 서비스 전환 검증과 다릅니다. 실제 복구는 앱과 scheduler의 쓰기를 중단하고, DB·WAL·이미지 버전을 함께 고려한 별도 절차로 수행합니다.
 
 ---
 
@@ -378,6 +387,14 @@ Prisma 6을 유지하면서 `@prisma/config@6.19.3`의 `deepmerge-ts`만 `8.0.2`
 2026-10-24 개발용 의존성 보강에서 Vitest와 `@vitest/mocker`는 4.1.12, Vite는 8.3.5, PostCSS는 8.5.31, NanoID는 3.3.20, `source-map-js`는 1.2.2로 갱신했습니다. Vitest의 선언된 최소 버전도 `^4.1.12`로 올렸습니다. Vitest 5는 Node 20을 지원하지 않아 채택하지 않았으며, 현재 Vite를 Node 20에서 실행하려면 20.19.0 이상이 필요합니다. 운영 의존성 그래프와 Prisma 6 한정 override는 유지했고 새 override는 추가하지 않았습니다.
 
 클린 설치 후 `npm audit --json`과 `npm audit --omit=dev --json`은 모두 0건을 보고했습니다. 이 결과는 해당 시점의 알려진 의존성 취약점 검사 결과이지 전체 애플리케이션의 보안 보장이나 운영 서버 반영 증거가 아닙니다.
+
+## CI 런타임·이미지 빌드
+
+GitHub Actions 자체는 Node 24 기반 `checkout@v7.0.1`, `setup-node@v7.1.0`, `setup-buildx-action@v4.4.1`, `build-push-action@v7.4.0`을 사용합니다. 테스트에서 선택하는 Node 20과 Docker의 `node:20-alpine`은 별개이며 변경하지 않았습니다.
+
+Docker 이미지는 체크아웃된 디렉터리에서 빌드해 현재 CI runner에만 로드합니다. registry push나 운영 배포는 하지 않습니다. `gha` 캐시는 `daesin-quality-ci-linux-amd64` 범위로 builder·runner 중간 계층까지 저장하며, 접근 범위는 GitHub의 브랜치/PR cache 격리를 따릅니다. 추가 PAT·registry 자격 증명은 사용하지 않습니다. builder의 Prisma 생성은 `npm run build`에 포함된 한 번만 명시적으로 실행하고, 별도로 의존성을 설치하는 runner 단계의 생성은 유지합니다.
+
+캐시가 비어 있거나 축출되면 전체 빌드가 필요합니다. 성능은 같은 revision의 최초·재사용 실행에서 캐시 적중과 빌드 단계·전체 job 시간을 함께 확인해야 하며, 캐시 설정만으로 단축을 주장하지 않습니다. 캐시 사용 여부와 관계없이 기능 테스트, 전체 의존성 감사와 최종 이미지의 실제 Prisma/SQLite 쿼리를 유지합니다. 이 CI는 Linux amd64 검증이며, ARM 운영 반영 증거를 대신하지 않습니다.
 
 ## 라이선스
 

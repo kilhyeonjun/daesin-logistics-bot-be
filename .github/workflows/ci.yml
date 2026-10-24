@@ -17,8 +17,8 @@ jobs:
       API_KEY: ci-test-api-key
       JWT_SECRET: ci-test-jwt-secret
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: 20
           cache: npm
@@ -31,8 +31,17 @@ jobs:
       - run: bash tests/deploy-blue-green.test.sh
       - run: docker compose config --quiet
       - run: npm audit --audit-level=high
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
       - name: Build production image without deploying
-        run: docker build --tag daesin-quality-ci .
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          load: true
+          push: false
+          tags: daesin-quality-ci
+          cache-from: type=gha,scope=daesin-quality-ci-linux-amd64
+          cache-to: type=gha,mode=max,scope=daesin-quality-ci-linux-amd64
       - name: Verify production Prisma runtime with isolated SQLite
         run: |
           docker run --rm --entrypoint node -e DATABASE_URL=file:/tmp/quality.sqlite daesin-quality-ci --input-type=module -e '
