@@ -13,11 +13,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "npm run build && tsx scripts/integration-test.ts",
+    "verify:ingestion": "node scripts/verify-ingestion-quality.mjs",
     "test:crawl": "tsx test-crawl.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "overrides": {
+    "@prisma/config@6.19.3": {
+      "deepmerge-ts": "8.0.2"
+    }
+  },
   "dependencies": {
     "@prisma/client": "^6.19.1",
     "axios": "^1.13.2",

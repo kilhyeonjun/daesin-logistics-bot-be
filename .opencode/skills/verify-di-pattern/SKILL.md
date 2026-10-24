@@ -36,7 +36,6 @@ description: TSyringe DI 패턴을 검증합니다. @injectable/@inject 데코�
 | `src/infrastructure/persistence/PrismaMigrationJobRepository.ts` | @injectable 인프라 구현체 |
 | `src/infrastructure/persistence/PrismaAdminRepository.ts` | @injectable 인프라 구현체 |
 | `src/infrastructure/crawling/CheerioHttpCrawler.ts` | @injectable 인프라 구현체 |
-| `src/infrastructure/cache/InMemoryCacheService.ts` | @injectable 인프라 구현체 |
 | `src/infrastructure/auth/JwtService.ts` | @injectable 인프라 서비스 |
 | `src/infrastructure/auth/PasswordService.ts` | @injectable 인프라 서비스 |
 | `src/interface/http/controllers/RouteController.ts` | @injectable 컨트롤러 |

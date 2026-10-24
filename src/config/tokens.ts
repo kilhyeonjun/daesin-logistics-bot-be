@@ -9,7 +9,6 @@ export const TOKENS = {
 
   // Ports
   Crawler: Symbol.for('ICrawler'),
-  CacheService: Symbol.for('ICacheService'),
 
   // Auth Services
   PasswordService: Symbol.for('PasswordService'),

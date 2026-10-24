@@ -1,7 +1,6 @@
 import { injectable, inject } from 'tsyringe';
 import type { IRouteRepository } from '../../domain/repositories/IRouteRepository.js';
 import type { ICrawler } from '../../domain/ports/ICrawler.js';
-import type { ICacheService } from '../../domain/ports/ICacheService.js';
 import { SearchDate } from '../../domain/value-objects/SearchDate.js';
 import { SyncResultDto } from '../dto/RouteDto.js';
 import { TOKENS } from '../../config/tokens.js';
@@ -12,9 +11,7 @@ export class SyncRoutesUseCase {
     @inject(TOKENS.Crawler)
     private readonly crawler: ICrawler,
     @inject(TOKENS.RouteRepository)
-    private readonly routeRepository: IRouteRepository,
-    @inject(TOKENS.CacheService)
-    private readonly cacheService: ICacheService
+    private readonly routeRepository: IRouteRepository
   ) {}
 
   async execute(date?: string): Promise<SyncResultDto> {
@@ -32,10 +29,7 @@ export class SyncRoutesUseCase {
     if (routes.length > 0) {
       const insertedCount = await this.routeRepository.upsertMany(routes);
 
-      const invalidatedCount = await this.cacheService.invalidateByPattern(
-        `routes:*:${searchDate.getValue()}`
-      );
-      console.log(`[${new Date().toLocaleString()}] ${insertedCount}건 저장, ${invalidatedCount}건 캐시 무효화 완료`);
+      console.log(`[${new Date().toLocaleString()}] ${insertedCount}건 저장 완료`);
 
       return { success: true, count: insertedCount, date: searchDate.getValue() };
     }

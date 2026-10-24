@@ -29,7 +29,6 @@ description: Clean Architecture 레이어 의존성 규칙을 검증합니다. �
 | `src/domain/repositories/IAdminRepository.ts` | 도메인 리포지토리 인터페이스 |
 | `src/domain/repositories/IMigrationJobRepository.ts` | 도메인 리포지토리 인터페이스 |
 | `src/domain/ports/ICrawler.ts` | 도메인 포트 인터페이스 |
-| `src/domain/ports/ICacheService.ts` | 도메인 포트 인터페이스 |
 | `src/domain/value-objects/LineCode.ts` | 값 객체 |
 | `src/domain/value-objects/SearchDate.ts` | 값 객체 |
 | `src/domain/value-objects/YearMonth.ts` | 값 객체 |
