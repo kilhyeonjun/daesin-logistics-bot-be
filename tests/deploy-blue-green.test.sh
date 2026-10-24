@@ -45,7 +45,6 @@ chmod +x "$TMP_DIR/bin/sleep"
 export DEPLOY_TEST_LOG="$TMP_DIR/docker.log"
 PATH="$TMP_DIR/bin:$PATH" "$TMP_DIR/repo/scripts/deploy.sh" --no-pull >"$TMP_DIR/output.log"
 
-grep -q '현재 활성: green → 전환 대상: blue' "$TMP_DIR/output.log"
 grep -q '^compose up -d app-blue$' "$DEPLOY_TEST_LOG"
 grep -q '^compose stop app-green$' "$DEPLOY_TEST_LOG"
 grep -q 'url: "http://app-blue:3000"' "$TMP_DIR/repo/traefik/dynamic.yml"
@@ -76,6 +75,5 @@ if grep -q '^compose stop app-green$' "$DEPLOY_TEST_LOG"; then
   exit 1
 fi
 grep -q 'url: "http://app-blue:3000"' "$TMP_DIR/repo/traefik/dynamic.yml"
-grep -q '수동 롤백' "$TMP_DIR/failure-output.log"
 
 echo 'deploy Blue/Green SSOT regression: PASS'

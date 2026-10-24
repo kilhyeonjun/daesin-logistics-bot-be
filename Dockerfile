@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY prisma ./prisma/
+COPY prisma/schema.prisma ./prisma/schema.prisma
 
 # Install dependencies
 RUN npm ci
@@ -15,7 +15,7 @@ COPY tsconfig.json ./
 COPY src ./src/
 
 # Generate Prisma client and build TypeScript
-RUN npx prisma generate && npm run build
+RUN npm run build
 
 # Production stage
 FROM node:20-alpine AS runner
@@ -29,14 +29,14 @@ RUN apk add --no-cache tzdata && \
 
 # Copy package files and install production dependencies only
 COPY package*.json ./
-COPY prisma ./prisma/
+COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci --only=production && npx prisma generate
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
 # Create data directory for SQLite
-RUN mkdir -p /app/data && chown -R appuser:nodejs /app
+RUN mkdir -p /app/data && chown appuser:nodejs /app/data
 
 # Switch to non-root user
 USER appuser
