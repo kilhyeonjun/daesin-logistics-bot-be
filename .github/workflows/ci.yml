@@ -30,7 +30,7 @@ jobs:
       - run: npm run verify:ingestion
       - run: bash tests/deploy-blue-green.test.sh
       - run: docker compose config --quiet
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --audit-level=high
       - name: Build production image without deploying
         run: docker build --tag daesin-quality-ci .
       - name: Verify production Prisma runtime with isolated SQLite

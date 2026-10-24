@@ -373,7 +373,11 @@ npm run verify:ingestion
 
 Prisma 6을 유지하면서 `@prisma/config@6.19.3`의 `deepmerge-ts`만 `8.0.2`로 고정합니다. 이 부모 패키지 한정 override는 순환 참조 병합의 stack overflow 취약점([GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx))에 대응하며, 전역 override나 Prisma 7 강제 업그레이드가 아닙니다. 해당 취약점이 이 서비스의 입력 경로에서 악용 가능했다고 주장하지 않습니다. 업스트림이 보장한 조합은 아니므로 Prisma/config 갱신 시 예외를 다시 검토해야 합니다.
 
-`tests/prisma-config.test.ts`는 실제 TypeScript 설정 파일의 로딩, 파일 위치 기준 상대 경로 해석, migration 설정 보존, 설정 파일 부재 처리를 검증합니다. CI는 기능 회귀·합성 수집 검증·`npm audit --omit=dev --audit-level=high`에 더해 Docker의 두 빌드 단계를 실행하고, 최종 이미지에서 임시 SQLite 쿼리를 실행합니다. 컨테이너 검증은 배포·운영 볼륨 연결 없이 수행합니다. 감사 통과는 실행 시점의 알려진 의존성 취약점 검사 결과이지 전체 애플리케이션의 보안 보장이 아닙니다.
+`tests/prisma-config.test.ts`는 실제 TypeScript 설정 파일의 로딩, 파일 위치 기준 상대 경로 해석, migration 설정 보존, 설정 파일 부재 처리를 검증합니다. CI는 기능 회귀·합성 수집 검증·`npm audit --audit-level=high`에 더해 Docker의 두 빌드 단계를 실행하고, 최종 이미지에서 임시 SQLite 쿼리를 실행합니다. 감사 대상에는 개발용 의존성도 포함되며, 기존과 같이 High 이상이면 CI가 실패합니다. 따라서 CI 통과만으로 Moderate·Low까지 0건이라고 해석하면 안 됩니다. 컨테이너 검증은 배포·운영 볼륨 연결 없이 수행합니다.
+
+2026-10-24 개발용 의존성 보강에서 Vitest와 `@vitest/mocker`는 4.1.12, Vite는 8.3.5, PostCSS는 8.5.31, NanoID는 3.3.20, `source-map-js`는 1.2.2로 갱신했습니다. Vitest의 선언된 최소 버전도 `^4.1.12`로 올렸습니다. Vitest 5는 Node 20을 지원하지 않아 채택하지 않았으며, 현재 Vite를 Node 20에서 실행하려면 20.19.0 이상이 필요합니다. 운영 의존성 그래프와 Prisma 6 한정 override는 유지했고 새 override는 추가하지 않았습니다.
+
+클린 설치 후 `npm audit --json`과 `npm audit --omit=dev --json`은 모두 0건을 보고했습니다. 이 결과는 해당 시점의 알려진 의존성 취약점 검사 결과이지 전체 애플리케이션의 보안 보장이나 운영 서버 반영 증거가 아닙니다.
 
 ## 라이선스
 
