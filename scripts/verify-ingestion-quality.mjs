@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import axios from 'axios';
 import iconv from 'iconv-lite';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { CheerioHttpCrawler } from '../dist/infrastructure/crawling/CheerioHttpCrawler.js';
 import { PrismaRouteRepository } from '../dist/infrastructure/persistence/PrismaRouteRepository.js';
 import { SyncRoutesUseCase } from '../dist/application/use-cases/SyncRoutesUseCase.js';
@@ -22,6 +22,10 @@ assert.ok(process.argv.slice(2).every(argument => argument === '--benchmark'), '
 const startedAt = new Date().toISOString();
 const started = performance.now();
 const benchmarkConfig = { sizes: [100, 1000], warmupRunsPerSize: 1, measuredRunsPerSize: 3, contentionWarmupRuns: 1, contentionMeasuredRuns: 3, lockHoldTargetMs: 150, readerPauseMs: 1, maxReaderSamplesPerRun: 1000 };
+// Pinned Quaint source parses socket_timeout as seconds and applies SQLite busy_timeout.
+// This separate client's shorter budget does not alter the original writer or short-contention runs.
+const recoveryConfig = { measuredRuns: 3, fixtureSocketTimeoutSeconds: 1, fixtureConnectionLimit: 1, rejectionDeadlineMs: 3000, holderTransactionTimeoutMs: 5000 };
+const sqliteEngineSource = `https://github.com/prisma/prisma-engines/blob/${Prisma.prismaVersion.engine}/quaint/src/connector/sqlite/`;
 const pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const deferred = () => {
   let resolve, reject;
@@ -66,7 +70,7 @@ const server = createServer(async (request, reply) => {
   reply.end(response.status === 200 ? iconv.encode(sourceHtml(response.rows), 'euc-kr') : 'Synthetic upstream failure');
 });
 const originalAdapter = axios.defaults.adapter;
-let writer, reader, locker;
+let writer, reader, locker, recoveryWriter;
 try {
   execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'db', 'push', '--schema', join(root, 'prisma/schema.prisma'), '--skip-generate'], {
     cwd: root,
@@ -316,6 +320,101 @@ try {
         error: outcome.error ? { name: outcome.error.name, code: outcome.error.code ?? null } : null,
         lockRead, replay, independentReadback: 'atomic-state-and-prior-ids-timestamps-preserved', automaticRetry: false });
     }
+    // Run only after all original samples, leaving their clients and budgets unchanged.
+    recoveryWriter = new PrismaClient({ datasourceUrl: `${databaseUrl}?socket_timeout=${recoveryConfig.fixtureSocketTimeoutSeconds}&connection_limit=${recoveryConfig.fixtureConnectionLimit}` });
+    const recoverySync = new SyncRoutesUseCase(new CheerioHttpCrawler(), new PrismaRouteRepository(recoveryWriter));
+    await recoveryWriter.$connect();
+    const fixtureBusyTimeout = await recoveryWriter.$queryRawUnsafe('PRAGMA busy_timeout');
+    assert.equal(Number(fixtureBusyTimeout[0].timeout), recoveryConfig.fixtureSocketTimeoutSeconds * 1000);
+    const rejectionReplay = [];
+    for (let run = 0; run < recoveryConfig.measuredRuns; run++) {
+      const before = await reader.route.findMany({ orderBy: { id: 'asc' } });
+      const old = before.find(row => row.searchDate === date && row.lineCode === first.code);
+      const correctedCount = 30000 + run;
+      const added = { code: String(920000 + run), count: '23', quantity: '24' };
+      response = { status: 200, date, rows: [{ ...first, count: String(correctedCount) }, added] };
+      const acquired = deferred(), releaseLock = deferred();
+      let transaction, acquiredAt, releaseRequestedAt, releasedAt, contenderStart, contenderSettledAt, deadline;
+      let preserved, rejection, lockOwnershipConfirmedAt;
+      const holding = locker.$transaction(async tx => {
+        transaction = tx;
+        assert.equal(await tx.$executeRawUnsafe("UPDATE routes SET count = count WHERE search_date = '20990102' AND line_code = '900001'"), 1);
+        acquiredAt = performance.now();
+        acquired.resolve();
+        await releaseLock.promise;
+      }, { timeout: recoveryConfig.holderTransactionTimeoutMs }).then(() => { releasedAt = performance.now(); }, error => { acquired.reject(error); throw error; });
+      holding.catch(() => {});
+      let contender;
+      const requestStart = requests.length;
+      try {
+        await acquired.promise;
+        contenderStart = performance.now();
+        contender = recoverySync.execute(date).then(result => ({ result }), error => ({ error })).finally(() => { contenderSettledAt = performance.now(); });
+        // Deadline is a failing guard, never an accepted rejection or a lock-release policy.
+        const outcome = await Promise.race([
+          contender,
+          new Promise(resolve => { deadline = setTimeout(() => resolve({ deadlineExceeded: true }), recoveryConfig.rejectionDeadlineMs); }),
+        ]);
+        clearTimeout(deadline);
+        assert.ok(!outcome.deadlineExceeded, 'Real contender did not reject within the fixture guard; no rejection evidence established');
+        assert.ok(outcome.error, 'A contender succeeding under the held writer lock is not rejection evidence');
+        const error = outcome.error;
+        assert.equal(error.name, 'PrismaClientKnownRequestError');
+        assert.equal(error.code, 'P1008');
+        assert.match(error.message, /timed?\s*out|timeout/i);
+        rejection = { name: error.name, code: error.code, message: error.message, meta: error.meta ?? null, clientVersion: error.clientVersion ?? null };
+        assert.equal(requests.length, requestStart + 1);
+        const readStart = performance.now();
+        const duringLock = await reader.route.findMany({ orderBy: { id: 'asc' } });
+        assert.deepEqual(duringLock, before);
+        assert.ok(!duringLock.some(row => row.lineCode === added.code));
+        preserved = { readOffsetFromLockMs: readStart - acquiredAt, readMs: performance.now() - readStart,
+          rows: duringLock.filter(row => row.searchDate === date), entireDatabaseExactlyUnchanged: true };
+        // Reusing the original transaction proves it has not expired/rolled back while we read.
+        assert.equal(await transaction.$executeRawUnsafe("UPDATE routes SET count = count WHERE search_date = '20990102' AND line_code = '900001'"), 1);
+        lockOwnershipConfirmedAt = performance.now();
+        assert.equal(requests.length, requestStart + 1, 'No automatic HTTP retry while rejection and preservation are observed');
+      } finally {
+        clearTimeout(deadline);
+        releaseRequestedAt = performance.now();
+        releaseLock.resolve();
+        try { await holding; } finally { if (contender) await contender; }
+      }
+      assert.ok(acquiredAt <= contenderStart && contenderSettledAt <= lockOwnershipConfirmedAt && lockOwnershipConfirmedAt <= releaseRequestedAt);
+      const afterRelease = await reader.route.findMany({ orderBy: { id: 'asc' } });
+      assert.deepEqual(afterRelease, before);
+      assert.equal(requests.length, requestStart + 1);
+      const replayStart = performance.now();
+      const result = await recoverySync.execute(date);
+      const replayMs = performance.now() - replayStart;
+      assert.deepEqual(result, { success: true, count: 2, date });
+      assert.equal(requests.length, requestStart + 2);
+      const committed = await reader.route.findMany({ orderBy: { id: 'asc' } });
+      assert.equal(committed.length, before.length + 1);
+      for (const prior of before) {
+        const expected = prior.id === old.id ? { ...prior, count: correctedCount, quantity: 2345 } : prior;
+        assert.deepEqual(committed.find(row => row.id === prior.id), expected);
+      }
+      const inserted = committed.find(row => row.searchDate === date && row.lineCode === added.code);
+      assert.ok(inserted && !before.some(row => row.id === inserted.id));
+      // Check every persisted insertion field against the existing fixture-shaped route.
+      assert.deepEqual(inserted, { ...old, id: inserted.id, createdAt: inserted.createdAt,
+        lineCode: added.code, count: 23, quantity: 24,
+        raceInfoUrl: old.raceInfoUrl?.replace(first.code, added.code) ?? null,
+        carDetailUrl: old.carDetailUrl?.replace(first.code, added.code) ?? null,
+        waypointUrl: old.waypointUrl?.replace(first.code, added.code) ?? null });
+      assert.ok(Number.isFinite(Date.parse(inserted.createdAt)));
+      rejectionReplay.push({ run: run + 1, phase: 'measured', correctedCode: first.code, correctedCount, addedCode: added.code,
+        priorRows: before.filter(row => row.searchDate === date),
+        lockAcquiredBeforeContender: true, contenderOffsetFromLockMs: contenderStart - acquiredAt,
+        contenderMs: contenderSettledAt - contenderStart, rejection,
+        rejectedWhileLockHeld: true, preservationBeforeRelease: preserved,
+        lockOwnershipConfirmedOffsetMs: lockOwnershipConfirmedAt - acquiredAt,
+        release: { requestedOffsetMs: releaseRequestedAt - acquiredAt, completedOffsetMs: releasedAt - acquiredAt, priorStatePreserved: true },
+        rejectedAttemptFixtureRequests: 1, automaticRetry: false,
+        replay: { explicit: true, elapsedMs: replayMs, result, fixtureRequests: 1,
+          rows: committed.filter(row => row.searchDate === date), priorIdsAndTimestampsPreserved: true, completeCorrectionAndAddition: true } });
+    }
     const measuredLoad = load.filter(sample => sample.phase === 'measured');
     const measuredContention = contention.filter(sample => sample.phase === 'measured');
     benchmark = {
@@ -331,6 +430,14 @@ try {
         storage: 'Fresh owned DB per invocation, cumulative dates within invocation; no cache flush, process restart or production-scale inference.',
       },
       load, contention,
+      rejectionReplay: { configuration: recoveryConfig,
+        budgetScope: 'Only the fourth fixture client uses socket_timeout=1 and connection_limit=1; original load and 150ms contention clients retain their settings. Holder timeout is explicitly the existing Prisma 5000ms default, not increased.',
+        fixtureBusyTimeoutMs: Number(fixtureBusyTimeout[0].timeout),
+        source: { engineVersion: require('@prisma/client').Prisma.prismaVersion.engine,
+          params: `${sqliteEngineSource}params.rs`, busyTimeoutAndBeginImmediate: `${sqliteEngineSource}native/mod.rs`, busyErrorMapping: `${sqliteEngineSource}error.rs` },
+        method: 'Three required real P1008 timeout rejections under an UPDATE lock, exact independent readback before release, active-transaction UPDATE confirmation, release and explicit replay of the identical response. A deadline or unexpected success fails the command; it is never accepted as lock evidence. BEGIN IMMEDIATE can reject before any upsert; this is lock rejection evidence, not a second mid-batch fault injection.',
+        samples: rejectionReplay,
+      },
       summaries: benchmarkConfig.sizes.map(size => {
         const samples = measuredLoad.filter(sample => sample.size === size);
         return { size, ingestion: summarize(samples.map(sample => sample.ingestionMs)), snapshotReader: summarize(samples.flatMap(sample => sample.probes.map(probe => probe.snapshotMs))), codeSearch: summarize(samples.flatMap(sample => sample.probes.map(probe => probe.searchMs))) };
@@ -342,14 +449,19 @@ try {
   console.log(JSON.stringify({
     verification: 'daesin-ingestion-quality', synthetic: true,
     transport: 'loopback HTTP with EUC-KR responses', storage: 'owned temporary SQLite',
-    readerWriterConnections: benchmarkEnabled ? 3 : 2, realUpstreamRequests: 0, fixtureRequests: requests.length,
+    prismaClientInstances: benchmarkEnabled ? 4 : 2,
+    connectionAccounting: { functionalClientInstances: 2, loadClientInstances: benchmarkEnabled ? 2 : null,
+      shortContentionClientInstances: benchmarkEnabled ? 3 : null, rejectionReplayClientInstances: benchmarkEnabled ? 4 : null,
+      fixtureContenderConnectionLimit: benchmarkEnabled ? 1 : null,
+      physicalConnectionCount: 'Not instrumented; PrismaClient instance counts are not measured physical connection counts.' },
+    realUpstreamRequests: 0, fixtureRequests: requests.length,
     startedAt, completedAt: new Date().toISOString(), observations, benchmark,
     measurementKind: benchmarkEnabled ? 'observed-synthetic-load-and-contention' : 'functional-synthetic-proof',
     limits: [
       'Synthetic fixtures do not prove live source completeness or a production freshness SLA.',
       'Upsert-only storage retains omitted rows; createdAt is first insertion, not last successful collection.',
       'Code search reads SQLite on every request; optional timings measure only this owned synthetic fixture, not production latency or capacity.',
-      'Small repeated samples, cumulative DB state and unflushed OS/SQLite caches do not establish an SLA. No elapsed-time pass/fail threshold is applied.',
+      'Small repeated samples, cumulative DB state and unflushed OS/SQLite caches do not establish an SLA. No latency-performance threshold is applied; the fixture rejection case separately fails if its 3000ms diagnostic guard expires.',
       'Reader samples are bounded and may straddle commit; pendingAtStart records overlap, not an isolated database wait. Contender timing includes transport and parsing.',
       'No scheduler, operational database, or production deployment was changed by this command.',
     ],
@@ -358,7 +470,7 @@ try {
 } finally {
   axios.defaults.adapter = originalAdapter;
   try {
-    await Promise.all([writer?.$disconnect(), reader?.$disconnect(), locker?.$disconnect()]);
+    await Promise.all([writer?.$disconnect(), reader?.$disconnect(), locker?.$disconnect(), recoveryWriter?.$disconnect()]);
   } finally {
     try {
       if (server.listening) await new Promise(resolve => server.close(resolve));
