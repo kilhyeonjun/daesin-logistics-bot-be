@@ -135,6 +135,49 @@ try {
   assert.deepEqual((await search.execute('900001')).map(row => [row.searchDate, row.count]), [[date, 1260], [response.date, 6]]);
   observations.push({ scenario: 'historical-correction-visible', code: '900001', dates: [date, response.date], historicalCount: 6 });
 
+  const beforeWriteFailure = await reader.route.findMany({ orderBy: { id: 'asc' } });
+  const third = { code: '900003', count: '11', quantity: '12' };
+  const rejected = { code: '900004', count: '13', quantity: '14' };
+  response = { status: 200, date, rows: [{ ...first, count: '9,999' }, third, rejected] };
+  // Fail the third write after an update and an insertion, only in this owned database.
+  await writer.$executeRawUnsafe(`CREATE TRIGGER synthetic_reject_route
+    BEFORE INSERT ON routes WHEN NEW.line_code = '900004'
+    BEGIN SELECT RAISE(ABORT, 'synthetic persistence failure'); END`);
+  const beforeWriteRequests = requests.length;
+  let writeFailureCode;
+  await assert.rejects(() => sync.execute(date), error => {
+    assert.equal(error.name, 'PrismaClientKnownRequestError');
+    assert.match(error.message, /constraint|synthetic persistence failure/i);
+    writeFailureCode = error.code;
+    return true;
+  });
+  assert.equal(requests.length, beforeWriteRequests + 1);
+  assert.deepEqual(await reader.route.findMany({ orderBy: { id: 'asc' } }), beforeWriteFailure);
+  assert.equal((await search.execute('900001'))[0].count, 1260);
+  assert.deepEqual(await search.execute('900003'), []);
+  assert.deepEqual(await search.execute('900004'), []);
+  observations.push({
+    scenario: 'mid-batch-write-failure-rolls-back', attemptedOperations: ['update', 'insert', 'rejected-insert'],
+    attempts: 1, writeFailureCode, priorRowsAndTimestampsPreserved: true, partialInsertVisible: false,
+  });
+
+  await writer.$executeRawUnsafe('DROP TRIGGER synthetic_reject_route');
+  assert.deepEqual(await sync.execute(date), { success: true, count: 3, date });
+  assert.deepEqual((await search.execute('900')).filter(row => row.searchDate === date)
+    .map(row => [row.lineCode, row.count]).sort(), [
+    ['900001', 9999], ['900002', 9], ['900003', 11], ['900004', 13],
+  ]);
+  const afterReplay = await reader.route.findMany({ orderBy: { id: 'asc' } });
+  for (const prior of beforeWriteFailure) {
+    const expected = prior.searchDate === date && prior.lineCode === '900001' ? { ...prior, count: 9999 } : prior;
+    assert.deepEqual(afterReplay.find(row => row.id === prior.id), expected);
+  }
+  observations.push({
+    scenario: 'explicit-replay-after-write-failure', committedOperations: 3,
+    storedCodes: ['900001', '900002', '900003', '900004'], readerCount: 9999,
+    priorIdsAndTimestampsPreserved: true, historicalRowsPreserved: true, automaticRetry: false,
+  });
+
   console.log(JSON.stringify({
     verification: 'daesin-ingestion-quality', synthetic: true,
     transport: 'loopback HTTP with EUC-KR responses', storage: 'owned temporary SQLite',
