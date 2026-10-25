@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:integration": "npm run build && tsx scripts/integration-test.ts",
     "verify:ingestion": "node scripts/verify-ingestion-quality.mjs",
+    "benchmark:ingestion": "node scripts/verify-ingestion-quality.mjs --benchmark",
     "test:crawl": "tsx test-crawl.ts"
   },
   "keywords": [],

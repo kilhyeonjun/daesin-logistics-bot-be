@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { tmpdir, cpus, platform, release, arch } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import axios from 'axios';
@@ -17,7 +17,23 @@ import { SearchRoutesByCodeUseCase } from '../dist/application/use-cases/SearchR
 import { CrawlingError } from '../dist/shared/errors/DomainError.js';
 
 // This command never accepts an operational database or upstream URL.
+const benchmarkEnabled = process.argv.slice(2).includes('--benchmark');
+assert.ok(process.argv.slice(2).every(argument => argument === '--benchmark'), 'Only --benchmark is accepted; no DB or URL inputs');
+const startedAt = new Date().toISOString();
 const started = performance.now();
+const benchmarkConfig = { sizes: [100, 1000], warmupRunsPerSize: 1, measuredRunsPerSize: 3, contentionWarmupRuns: 1, contentionMeasuredRuns: 3, lockHoldTargetMs: 150, readerPauseMs: 1, maxReaderSamplesPerRun: 1000 };
+const pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const deferred = () => {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+};
+// Nearest-rank percentiles, no interpolation; with three measured runs p95 is the maximum.
+function summarize(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const percentile = fraction => sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)];
+  return { sampleCount: sorted.length, minMs: sorted[0] ?? null, p50Ms: percentile(0.5) ?? null, p95Ms: percentile(0.95) ?? null, maxMs: sorted.at(-1) ?? null };
+}
 const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(import.meta.url);
 const directory = await mkdtemp(join(tmpdir(), 'daesin-quality-'));
@@ -50,7 +66,7 @@ const server = createServer(async (request, reply) => {
   reply.end(response.status === 200 ? iconv.encode(sourceHtml(response.rows), 'euc-kr') : 'Synthetic upstream failure');
 });
 const originalAdapter = axios.defaults.adapter;
-let writer, reader;
+let writer, reader, locker;
 try {
   execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'db', 'push', '--schema', join(root, 'prisma/schema.prisma'), '--skip-generate'], {
     cwd: root,
@@ -178,22 +194,176 @@ try {
     priorIdsAndTimestampsPreserved: true, historicalRowsPreserved: true, automaticRetry: false,
   });
 
+  let benchmark;
+  if (benchmarkEnabled) {
+    const measuredAt = new Date().toISOString();
+    const measurementStart = performance.now();
+    const load = [], contention = [];
+    let runNumber = 0;
+    for (const size of benchmarkConfig.sizes) {
+      for (let run = 0; run < benchmarkConfig.warmupRunsPerSize + benchmarkConfig.measuredRunsPerSize; run++) {
+        const phase = run < benchmarkConfig.warmupRunsPerSize ? 'warmup' : 'measured';
+        const sampleDate = `209902${String(++runNumber).padStart(2, '0')}`;
+        const rows = Array.from({ length: size }, (_, index) => ({ code: String(100000 + index), count: String(index + 1), quantity: String(index + 2) }));
+        response = { status: 200, date: sampleDate, rows };
+        assert.deepEqual(await readerRepository.findByDate(sampleDate), []);
+        const probes = [];
+        const requestStart = requests.length;
+        let settled = false, ingestionMs;
+        const sampleStart = performance.now();
+        const ingestion = sync.execute(sampleDate).then(result => ({ result }), error => ({ error })).finally(() => { ingestionMs = performance.now() - sampleStart; settled = true; });
+        let readerFailure;
+        try {
+          do {
+            const probeStart = performance.now();
+            const pendingAtStart = !settled;
+            const snapshot = await readerRepository.findByDate(sampleDate);
+            const snapshotMs = performance.now() - probeStart;
+            // Each independent SELECT must see the entire transaction or none of it.
+            assert.ok(snapshot.length === 0 || snapshot.length === size);
+            for (const [index, row] of snapshot.entries()) {
+              assert.equal(row.lineCode, rows[index].code);
+              assert.equal(row.count, index + 1);
+              assert.equal(row.quantity, index + 2);
+            }
+            const searchStart = performance.now();
+            const found = (await search.execute(rows[0].code)).filter(row => row.searchDate === sampleDate);
+            const searchMs = performance.now() - searchStart;
+            assert.ok(found.length === 0 || (found.length === 1 && found[0].count === 1));
+            probes.push({ offsetMs: probeStart - sampleStart, pendingAtStart, snapshotMs, searchMs, visibleRows: snapshot.length, searchVisibleRows: found.length });
+            if (!settled) await pause(benchmarkConfig.readerPauseMs);
+          } while (!settled && probes.length < benchmarkConfig.maxReaderSamplesPerRun);
+        } catch (error) { readerFailure = error; }
+        const outcome = await ingestion;
+        if (readerFailure) throw readerFailure;
+        if (outcome.error) throw outcome.error;
+        assert.deepEqual(outcome.result, { success: true, count: size, date: sampleDate });
+        assert.equal(requests.length, requestStart + 1);
+        const finalRows = await readerRepository.findByDate(sampleDate);
+        assert.equal(finalRows.length, size);
+        for (const [index, row] of finalRows.entries()) {
+          assert.equal(row.lineCode, rows[index].code);
+          assert.equal(row.count, index + 1);
+          assert.equal(row.quantity, index + 2);
+        }
+        load.push({ phase, size, run: run + 1, ingestionMs, fixtureRequests: requests.length - requestStart, independentReadback: 'complete-deterministic-records', probes });
+      }
+    }
+
+    locker = new PrismaClient({ datasourceUrl: databaseUrl });
+    await locker.$connect();
+    for (let run = 0; run < benchmarkConfig.contentionWarmupRuns + benchmarkConfig.contentionMeasuredRuns; run++) {
+      const phase = run < benchmarkConfig.contentionWarmupRuns ? 'warmup' : 'measured';
+      const before = await reader.route.findMany({ orderBy: { id: 'asc' } });
+      const old = before.find(row => row.searchDate === date && row.lineCode === first.code);
+      const correctedCount = 20000 + run;
+      const added = { code: String(910000 + run), count: '17', quantity: '18' };
+      response = { status: 200, date, rows: [{ ...first, count: String(correctedCount) }, added] };
+      const acquired = deferred(), releaseLock = deferred();
+      let acquiredAt, releaseRequestedAt, releasedAt;
+      // A third PrismaClient owns a real SQLite write transaction. The UPDATE must finish
+      // before the contender starts; a no-op value change still acquires the writer lock.
+      const holding = locker.$transaction(async transaction => {
+        assert.equal(await transaction.$executeRawUnsafe("UPDATE routes SET count = count WHERE search_date = '20990102' AND line_code = '900001'"), 1);
+        acquiredAt = performance.now();
+        acquired.resolve();
+        await releaseLock.promise;
+      }).then(() => { releasedAt = performance.now(); }, error => { acquired.reject(error); throw error; });
+      // Observe early transaction errors immediately, then propagate at the awaited boundary.
+      holding.catch(() => {});
+      let contender, contenderStart, contenderSettledAt, lockRead;
+      const requestStart = requests.length;
+      try {
+        await acquired.promise;
+        contenderStart = performance.now();
+        contender = sync.execute(date).then(result => ({ result }), error => ({ error })).finally(() => { contenderSettledAt = performance.now(); });
+        const readStart = performance.now();
+        const readDuringLock = (await search.execute(first.code)).find(row => row.searchDate === date);
+        lockRead = { latencyMs: performance.now() - readStart, count: readDuringLock.count };
+        assert.equal(readDuringLock.count, old.count);
+        // Target is measured from lock acquisition, not from the completion of the reader.
+        await pause(Math.max(0, benchmarkConfig.lockHoldTargetMs - (performance.now() - acquiredAt)));
+      } finally {
+        releaseRequestedAt = performance.now();
+        releaseLock.resolve();
+        try { await holding; } finally { if (contender) await contender; }
+      }
+      const outcome = await contender;
+      assert.equal(requests.length, requestStart + 1);
+      const afterAttempt = await reader.route.findMany({ orderBy: { id: 'asc' } });
+      let replay = null;
+      if (outcome.error) {
+        assert.deepEqual(afterAttempt, before);
+        const replayStart = performance.now();
+        assert.deepEqual(await sync.execute(date), { success: true, count: 2, date });
+        replay = { explicit: true, elapsedMs: performance.now() - replayStart, outcome: 'success' };
+        assert.equal(requests.length, requestStart + 2);
+      } else {
+        assert.deepEqual(outcome.result, { success: true, count: 2, date });
+      }
+      const committed = await reader.route.findMany({ orderBy: { id: 'asc' } });
+      assert.equal(committed.length, before.length + 1);
+      for (const prior of before) {
+        const expected = prior.id === old.id ? { ...prior, count: correctedCount, quantity: 2345 } : prior;
+        assert.deepEqual(committed.find(row => row.id === prior.id), expected);
+      }
+      assert.equal(committed.find(row => row.lineCode === added.code).count, 17);
+      contention.push({ phase, run: run + 1, lockAcquiredBeforeContender: acquiredAt <= contenderStart,
+        lockHeldUntilReleaseRequestMs: releaseRequestedAt - acquiredAt, lockTransactionMs: releasedAt - acquiredAt,
+        contenderOffsetFromLockMs: contenderStart - acquiredAt, contenderMs: contenderSettledAt - contenderStart,
+        contenderSettledBeforeLockRelease: contenderSettledAt < releasedAt,
+        outcome: outcome.error ? 'rejected' : 'success',
+        error: outcome.error ? { name: outcome.error.name, code: outcome.error.code ?? null } : null,
+        lockRead, replay, independentReadback: 'atomic-state-and-prior-ids-timestamps-preserved', automaticRetry: false });
+    }
+    const measuredLoad = load.filter(sample => sample.phase === 'measured');
+    const measuredContention = contention.filter(sample => sample.phase === 'measured');
+    benchmark = {
+      synthetic: true, measuredAt, completedAt: new Date().toISOString(), intervalMs: performance.now() - measurementStart,
+      configuration: benchmarkConfig,
+      environment: { node: process.version, platform: platform(), osRelease: release(), arch: arch(), cpuModel: cpus()[0]?.model ?? 'unknown', logicalCpus: cpus().length, prismaClient: require('@prisma/client/package.json').version,
+        sqlite: await reader.$queryRawUnsafe('SELECT sqlite_version() AS version'), journalMode: await reader.$queryRawUnsafe('PRAGMA journal_mode') },
+      method: {
+        ingestion: 'Wall-clock sync.execute: loopback HTTP + EUC-KR parsing + real repository transaction; concurrent reader work included, final readback excluded.',
+        reader: 'Separate PrismaClient; sequential date-snapshot SELECT and real code-search use case, sampled while ingestion is pending. Separate SELECTs may see different committed states.',
+        contention: 'Independent third PrismaClient obtains UPDATE writer lock before contender; hold target 150ms; no changed production timeout/retry/concurrency. Contender duration is end-to-end, not isolated SQLite wait.',
+        percentile: 'Nearest rank: sorted[ceil(p*n)-1]; warmups excluded; per-size ingestion and pooled per-size reader samples. Three measured runs make p95 the maximum.',
+        storage: 'Fresh owned DB per invocation, cumulative dates within invocation; no cache flush, process restart or production-scale inference.',
+      },
+      load, contention,
+      summaries: benchmarkConfig.sizes.map(size => {
+        const samples = measuredLoad.filter(sample => sample.size === size);
+        return { size, ingestion: summarize(samples.map(sample => sample.ingestionMs)), snapshotReader: summarize(samples.flatMap(sample => sample.probes.map(probe => probe.snapshotMs))), codeSearch: summarize(samples.flatMap(sample => sample.probes.map(probe => probe.searchMs))) };
+      }),
+      contentionSummary: { contender: summarize(measuredContention.map(sample => sample.contenderMs)), successes: measuredContention.filter(sample => sample.outcome === 'success').length, rejections: measuredContention.filter(sample => sample.outcome === 'rejected').length },
+    };
+  }
+
   console.log(JSON.stringify({
     verification: 'daesin-ingestion-quality', synthetic: true,
     transport: 'loopback HTTP with EUC-KR responses', storage: 'owned temporary SQLite',
-    readerWriterConnections: 2, realUpstreamRequests: 0, fixtureRequests: requests.length,
-    observations,
+    readerWriterConnections: benchmarkEnabled ? 3 : 2, realUpstreamRequests: 0, fixtureRequests: requests.length,
+    startedAt, completedAt: new Date().toISOString(), observations, benchmark,
+    measurementKind: benchmarkEnabled ? 'observed-synthetic-load-and-contention' : 'functional-synthetic-proof',
     limits: [
       'Synthetic fixtures do not prove live source completeness or a production freshness SLA.',
       'Upsert-only storage retains omitted rows; createdAt is first insertion, not last successful collection.',
-      'Code search reads SQLite on every request; database load and production latency are not measured here.',
+      'Code search reads SQLite on every request; optional timings measure only this owned synthetic fixture, not production latency or capacity.',
+      'Small repeated samples, cumulative DB state and unflushed OS/SQLite caches do not establish an SLA. No elapsed-time pass/fail threshold is applied.',
+      'Reader samples are bounded and may straddle commit; pendingAtStart records overlap, not an isolated database wait. Contender timing includes transport and parsing.',
       'No scheduler, operational database, or production deployment was changed by this command.',
     ],
     elapsedMs: Math.round(performance.now() - started),
   }, null, 2));
 } finally {
   axios.defaults.adapter = originalAdapter;
-  await Promise.all([writer?.$disconnect(), reader?.$disconnect()]);
-  if (server.listening) await new Promise(resolve => server.close(resolve));
-  await rm(directory, { recursive: true, force: true });
+  try {
+    await Promise.all([writer?.$disconnect(), reader?.$disconnect(), locker?.$disconnect()]);
+  } finally {
+    try {
+      if (server.listening) await new Promise(resolve => server.close(resolve));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
 }

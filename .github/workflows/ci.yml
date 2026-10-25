@@ -28,6 +28,8 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run verify:ingestion
+      - name: Exercise synthetic load and contention invariants
+        run: npm run benchmark:ingestion
       - run: bash tests/deploy-blue-green.test.sh
       - run: docker compose config --quiet
       - run: npm audit --audit-level=high

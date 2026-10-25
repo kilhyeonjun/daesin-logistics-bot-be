@@ -376,6 +376,24 @@ npm run verify:ingestion
 
 DB 실패 주입은 검증 명령이 만든 임시 DB에서만 수행합니다. 실제 `SyncRoutesUseCase`와 `PrismaRouteRepository`를 사용하며, 예외를 성공으로 바꾸거나 자동 재시도를 추가하지 않습니다. 이 재현은 SQLite transaction의 배치 원자성을 확인하는 것이며 프로세스 강제 종료·전원 손실·운영 장애 복구까지 검증한 것은 아닙니다.
 
+### 선택 실행: 반복 합성 부하·독립 writer 경합 측정
+
+```bash
+npm run build
+npm run benchmark:ingestion
+# npm 배너 없이 실행 로그와 마지막 JSON receipt 저장
+node scripts/verify-ingestion-quality.mjs --benchmark > ingestion-benchmark.log
+```
+
+`--benchmark`는 위 **10개 기능 시나리오를 먼저 그대로 실행**하고, 같은 loopback 서버·임시 SQLite·실제 crawler/sync/repository/search를 재사용합니다. 기본 `verify:ingestion`은 유지하고 측정은 `--benchmark`로 선택합니다. CI는 두 명령을 모두 실행해 기능·원자성·readback을 확인하되 시간 임계값으로 통과 여부를 정하지 않습니다. 외부 URL·DB 경로나 임의 크기 입력은 받지 않습니다. 각 invocation은 새 임시 DB를 만들고 종료 시 연결·서버·DB를 `finally`에서 정리합니다. 두 실행 명령은 각각 별도 측정이므로 receipt 하나만 필요하면 마지막 `node` 명령만 실행합니다.
+
+- **부하:** 100행, 1,000행 순서로 각각 warmup 1회와 measured 3회(총 8회). 각 회차는 새 합성 날짜에 결정적인 고유 코드·수량을 넣습니다. DB는 invocation 안에서 누적되고 OS/SQLite 캐시를 비우지 않으므로 cold-start 비교가 아닙니다. 수집 시간은 `sync.execute` 시작부터 완료까지의 HTTP·EUC-KR 파싱·transaction 전체이며, 최종 검증 readback은 제외합니다.
+- **동시 reader:** 별도 PrismaClient가 수집 중 날짜 전체 SELECT와 실제 코드 검색을 순차 반복합니다. 최대 회차당 1,000개 probe, 미완료 시 1ms 간격이며, 실제 시작 offset·수집 pending 여부·각 조회 시간·관측 행 수를 저장합니다. 단일 날짜 SELECT는 0행 또는 전체 행만 허용하고 필드 값도 확인합니다. 서로 다른 SELECT는 commit 전후를 나누어 볼 수 있습니다. 마지막에는 독립 연결에서 전체 행을 다시 확인합니다. 샘플링 간격이나 완료 시간 자체에는 합격 기준이 없습니다.
+- **경합:** warmup 1회와 measured 3회. 세 번째 독립 PrismaClient의 transaction이 기존 행에 실제 UPDATE를 완료하여 writer lock을 획득한 다음에만 contender `sync.execute`를 시작합니다. lock 획득 기준 150ms hold를 목표로 release를 요청하며 실제 hold·release 완료 시각, contender 시작 offset·종료까지의 시간, 성공/거절·오류 name/code와 lock 중 독립 조회 시간·값을 남깁니다. 150ms는 SLA나 시간 assertion이 아니고 스케줄링·조회 지연으로 길어질 수 있습니다. contender 시간은 순수 DB wait가 아니라 transport·파싱을 포함합니다. 엔진이 성공하면 그 결과를, 거절하면 기존 전체 행·ID·시각 보존을 검증한 뒤 **명시적 재실행 1회**의 결과를 기록합니다. 자동 retry·production timeout·동시성 설정은 바꾸지 않습니다.
+- **receipt:** `synthetic: true`, 10개 기능 관측, warmup/measured 원시 sample, reader 원시 probe, 부하별 요약, 경합 결과, Node/OS/CPU/Prisma/SQLite·journal mode, 고정 설정, 측정 시작·종료·구간과 명령 전체 `elapsedMs`를 JSON으로 출력합니다. 로컬 DB 경로·호스트명은 포함하지 않습니다. percentile은 warmup을 제외하고 정렬한 값의 `ceil(p*n)-1` 인덱스를 고르는 nearest-rank 방식입니다. 부하별 수집은 n=3이므로 p95는 최댓값이며, reader 요약은 해당 부하의 measured probe를 합친 값입니다. 원자료와 sampleCount를 함께 해석해야 합니다.
+
+이 측정은 소규모 loopback·임시 SQLite의 관측이지 운영 처리량, freshness SLA, 최대 용량, 장애복구 또는 실제 원천 완전성의 증거가 아닙니다. 성능 수치에 통과 임계값을 두지 않으며 기능·원자성·readback assertion만 필수입니다. 프로세스·전원 강제 종료, 외부 네트워크, 운영 DB·scheduler·스키마·배포는 범위 밖입니다. 공개 시 receipt의 실제 환경과 원자료를 유지하고 합성 관측임을 표시해야 합니다.
+
 노선코드 검색은 다른 검색 경로처럼 DB를 직접 조회합니다. 별도 scheduler 프로세스에서 무효화할 수 없던 웹 프로세스의 1시간 메모리 캐시와 관련 코드는 제거했습니다. 대신 검색 요청마다 DB 조회가 발생하며, 이 합성 검증으로 운영 처리량이나 지연 시간을 주장하지 않습니다.
 
 **해석 범위:** `sync.count`는 신규 행 수가 아니라 처리한 upsert 연산 수입니다. 원천 응답에서 빠진 행은 저장소에 남으므로 완전한 최신 스냅샷과 같지 않습니다. `createdAt`은 최초 저장 시각이지 마지막 수집 성공 시각이 아닙니다. 합성 재현·CI 통과는 실제 원천의 완전성, 운영 최신성 SLA, 운영 서버 배포를 증명하지 않습니다. cron·재시도 정책·DB 스키마·API 응답 형식은 변경하지 않았습니다.
